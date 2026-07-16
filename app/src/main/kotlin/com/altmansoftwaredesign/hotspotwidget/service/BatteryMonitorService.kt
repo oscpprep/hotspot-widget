@@ -43,6 +43,11 @@ class BatteryMonitorService : Service() {
     // — Quick Settings, Settings, another app, or Android auto-disabling it.
     private val stateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == ACTION_TETHER_STATE_CHANGED) {
+                // Cheap to log, and the only signal that external-change detection
+                // is alive — it is easy to break silently via receiver flags.
+                Log.d(TAG, "Tether state changed externally; refreshing")
+            }
             refresh()
         }
     }
@@ -91,11 +96,18 @@ class BatteryMonitorService : Service() {
                 addAction(Intent.ACTION_BATTERY_CHANGED)
                 addAction(ACTION_TETHER_STATE_CHANGED)
             }
+            // Must be EXPORTED: both actions are protected broadcasts sent by the
+            // system, and TETHER_STATE_CHANGED comes from the networkstack uid.
+            // RECEIVER_NOT_EXPORTED makes ContextCompat attach a private
+            // permission that those senders don't hold, and the broadcast is then
+            // silently dropped — which killed external-change detection entirely.
+            // Protected broadcasts can't be spoofed by other apps, so EXPORTED
+            // costs us nothing here.
             ContextCompat.registerReceiver(
                 this,
                 stateReceiver,
                 filter,
-                ContextCompat.RECEIVER_NOT_EXPORTED
+                ContextCompat.RECEIVER_EXPORTED
             )
             receiverRegistered = true
         }
