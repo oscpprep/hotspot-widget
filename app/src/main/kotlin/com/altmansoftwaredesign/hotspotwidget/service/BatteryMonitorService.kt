@@ -58,9 +58,12 @@ class BatteryMonitorService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_TOGGLE) {
-            scope.launch {
-                performToggle()
-                doRefresh()
+            // TARGET_UNSET should be unreachable — ConfirmToggleActivity always
+            // sets it — but we refuse to guess rather than pick a direction.
+            when (intent.getIntExtra(EXTRA_TARGET_ENABLED, TARGET_UNSET)) {
+                TARGET_ON -> applyHotspot(enable = true)
+                TARGET_OFF -> applyHotspot(enable = false)
+                else -> Log.w(TAG, "Toggle request with no target state; ignoring")
             }
         } else {
             refresh()
@@ -68,15 +71,17 @@ class BatteryMonitorService : Service() {
         return START_STICKY
     }
 
-    /** Flips the hotspot based on its current state. */
-    private suspend fun performToggle() {
-        val repo = HotspotRepository(applicationContext)
-        when (repo.getHotspotState().isEnabled) {
-            true -> repo.disableHotspot()
-            false -> repo.enableHotspot()
-            // State unreadable: refuse to guess. Toggling blind could just as
-            // easily kill a live hotspot as start one.
-            null -> Log.w(TAG, "Hotspot state unknown; refusing to toggle")
+    /**
+     * Drives the hotspot to [enable]. Deliberately does NOT re-read the current
+     * state and flip it: the user confirmed one specific action against the state
+     * the dialog showed them, and if that state changed in between, re-reading
+     * would silently do the opposite of what they agreed to.
+     */
+    private fun applyHotspot(enable: Boolean) {
+        scope.launch {
+            val repo = HotspotRepository(applicationContext)
+            if (enable) repo.enableHotspot() else repo.disableHotspot()
+            doRefresh()
         }
     }
 
@@ -168,6 +173,11 @@ class BatteryMonitorService : Service() {
         private const val CHANNEL_ID = "battery_monitor"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_TOGGLE = "com.altmansoftwaredesign.hotspotwidget.action.TOGGLE"
+        private const val EXTRA_TARGET_ENABLED =
+            "com.altmansoftwaredesign.hotspotwidget.extra.TARGET_ENABLED"
+        private const val TARGET_UNSET = -1
+        private const val TARGET_OFF = 0
+        private const val TARGET_ON = 1
 
         // Hidden system broadcast (ConnectivityManager.ACTION_TETHER_STATE_CHANGED).
         // Not a public constant, but the action string is stable in practice; if a
@@ -183,10 +193,15 @@ class BatteryMonitorService : Service() {
             context.startForegroundService(Intent(context, BatteryMonitorService::class.java))
         }
 
-        /** Toggle the hotspot via the (foreground) service, then refresh everything. */
-        fun toggle(context: Context) {
+        /**
+         * Drive the hotspot to [enable] via the (foreground) service, then refresh
+         * everything. Callers pass the state the user actually confirmed, not a
+         * request to flip whatever is current.
+         */
+        fun setHotspot(context: Context, enable: Boolean) {
             val intent = Intent(context, BatteryMonitorService::class.java).apply {
                 action = ACTION_TOGGLE
+                putExtra(EXTRA_TARGET_ENABLED, if (enable) TARGET_ON else TARGET_OFF)
             }
             context.startForegroundService(intent)
         }

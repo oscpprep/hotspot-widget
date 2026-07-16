@@ -81,7 +81,10 @@ class ConfirmToggleActivity : Activity() {
                     )
                 } else {
                     vibrate()
-                    BatteryMonitorService.toggle(this)
+                    // Send the state the user just agreed to, not "flip whatever
+                    // is current" — those can differ if the hotspot changed while
+                    // the dialog was up.
+                    BatteryMonitorService.setHotspot(this, enable = !isCurrentlyEnabled)
                 }
                 finish()
             }
