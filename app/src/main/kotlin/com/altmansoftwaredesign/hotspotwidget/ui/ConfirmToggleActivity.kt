@@ -31,8 +31,22 @@ class ConfirmToggleActivity : Activity() {
             val isEnabled = withContext(Dispatchers.IO) {
                 HotspotRepository(applicationContext).getHotspotState().isEnabled
             }
-            showDialog(isEnabled)
+            if (isEnabled == null) showUnavailableDialog() else showDialog(isEnabled)
         }
+    }
+
+    /**
+     * We couldn't read the hotspot state, so we can't say whether "confirm" would
+     * turn it on or off. Offering the toggle anyway risks doing the opposite of
+     * what the user intends, so the honest move is to say so and do nothing.
+     */
+    private fun showUnavailableDialog() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.state_unavailable_title)
+            .setMessage(R.string.state_unavailable_message)
+            .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
     }
 
     private fun showDialog(isCurrentlyEnabled: Boolean) {

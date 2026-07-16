@@ -3,6 +3,7 @@
     <string name="app_name">Hotspot Widget</string>
     <string name="hotspot_on">Hotspot On</string>
     <string name="hotspot_off">Hotspot Off</string>
+    <string name="hotspot_unknown">Hotspot —</string>
     <string name="hotspot_status">Hotspot Status</string>
     <string name="battery_status">Battery Status</string>
     <string name="toggle_hotspot">Toggle Hotspot</string>
@@ -12,13 +13,18 @@
     <string name="turn_off">Turn Off</string>
     <string name="cancel">Cancel</string>
 
+    <!-- Shown when the hotspot state can't be read, so a toggle can't be offered safely. -->
+    <string name="state_unavailable_title">Hotspot state unavailable</string>
+    <string name="state_unavailable_message">This device isn\'t reporting its hotspot state, so the widget won\'t guess at it. Use Quick Settings to change the hotspot.</string>
+
     <!-- Foreground service notification -->
     <string name="notification_channel_name">Battery &amp; hotspot status</string>
     <string name="notification_channel_desc">Keeps the widget\'s battery and hotspot reading up to date.</string>
     <string name="notification_status">Hotspot: %1$s · Battery %2$s</string>
     <string name="status_on">On</string>
     <string name="status_off">Off</string>
-    <string name="status_updating">…</string>
+    <!-- Shown when a reading is genuinely unavailable — never as a stand-in for a real value. -->
+    <string name="status_unknown">—</string>
     <string name="grant_write_settings">Allow “Modify system settings”, then tap the widget again to toggle the hotspot.</string>
 
     <!-- Setup screen -->

@@ -36,7 +36,10 @@ class HotspotRepository(context: Context) : IHotspotRepository {
         return try {
             HotspotState(isEnabled = isHotspotEnabled())
         } catch (e: Exception) {
-            HotspotState(isEnabled = false, error = e.message)
+            // Unknown, NOT off. Reporting "off" here would be a confident lie the
+            // moment the hidden API changes under us.
+            Log.w("HotspotRepo", "Could not read hotspot state", e)
+            HotspotState(isEnabled = null, error = e.message ?: e.javaClass.simpleName)
         }
     }
 
@@ -115,18 +118,16 @@ class HotspotRepository(context: Context) : IHotspotRepository {
     // and "wlan"/"ap" are the actual OS network-interface name prefixes for the
     // Wi-Fi tethering interface (e.g. wlan0, ap0). They are external identifiers,
     // not typos, so spell-checking is suppressed for this function only.
+    // Throws if the reflection fails; the caller turns that into an "unknown"
+    // state. Do not swallow it into `false` — see [getHotspotState].
     @Suppress("SpellCheckingInspection")
     @SuppressLint("MissingPermission", "PrivateApi", "DiscouragedPrivateApi", "SoonBlockedPrivateApi")
     private fun isHotspotEnabled(): Boolean {
-        return try {
-            val method = connectivityManager.javaClass.getDeclaredMethod("getTetheredIfaces")
-            method.isAccessible = true
-            @Suppress("UNCHECKED_CAST")
-            val tethered = method.invoke(connectivityManager) as Array<String>
-            tethered.any { it.startsWith("wlan") || it.startsWith("ap") }
-        } catch (_: Exception) {
-            false
-        }
+        val method = connectivityManager.javaClass.getDeclaredMethod("getTetheredIfaces")
+        method.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val tethered = method.invoke(connectivityManager) as Array<String>
+        return tethered.any { it.startsWith("wlan") || it.startsWith("ap") }
     }
 
     private companion object {

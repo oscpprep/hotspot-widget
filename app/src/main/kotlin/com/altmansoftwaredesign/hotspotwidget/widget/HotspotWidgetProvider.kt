@@ -51,16 +51,17 @@ class HotspotWidgetProvider : AppWidgetProvider() {
 
                 val views = RemoteViews(context.packageName, R.layout.widget_layout)
 
-                // Update hotspot status
-                val hotspotIconRes = if (hotspotState.isEnabled) {
-                    R.drawable.ic_hotspot_on
-                } else {
-                    R.drawable.ic_hotspot_off
+                // Update hotspot status. A null reading means we genuinely don't
+                // know, so show that rather than defaulting to "off".
+                val hotspotIconRes = when (hotspotState.isEnabled) {
+                    true -> R.drawable.ic_hotspot_on
+                    false -> R.drawable.ic_hotspot_off
+                    null -> R.drawable.ic_hotspot_unknown
                 }
-                val hotspotStatusText = if (hotspotState.isEnabled) {
-                    R.string.hotspot_on
-                } else {
-                    R.string.hotspot_off
+                val hotspotStatusText = when (hotspotState.isEnabled) {
+                    true -> R.string.hotspot_on
+                    false -> R.string.hotspot_off
+                    null -> R.string.hotspot_unknown
                 }
                 views.setImageViewResource(R.id.hotspot_icon, hotspotIconRes)
                 views.setTextViewText(R.id.hotspot_status, context.getString(hotspotStatusText))

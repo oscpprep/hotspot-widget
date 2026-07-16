@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.altmansoftwaredesign.hotspotwidget.R
@@ -70,10 +71,12 @@ class BatteryMonitorService : Service() {
     /** Flips the hotspot based on its current state. */
     private suspend fun performToggle() {
         val repo = HotspotRepository(applicationContext)
-        if (repo.getHotspotState().isEnabled) {
-            repo.disableHotspot()
-        } else {
-            repo.enableHotspot()
+        when (repo.getHotspotState().isEnabled) {
+            true -> repo.disableHotspot()
+            false -> repo.enableHotspot()
+            // State unreadable: refuse to guess. Toggling blind could just as
+            // easily kill a live hotspot as start one.
+            null -> Log.w(TAG, "Hotspot state unknown; refusing to toggle")
         }
     }
 
@@ -121,9 +124,9 @@ class BatteryMonitorService : Service() {
         val hotspotText = when (hotspotOn) {
             true -> getString(R.string.status_on)
             false -> getString(R.string.status_off)
-            null -> getString(R.string.status_updating)
+            null -> getString(R.string.status_unknown)
         }
-        val batteryText = batteryPct?.let { "$it%" } ?: getString(R.string.status_updating)
+        val batteryText = batteryPct?.let { "$it%" } ?: getString(R.string.status_unknown)
         val content = getString(R.string.notification_status, hotspotText, batteryText)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -161,6 +164,7 @@ class BatteryMonitorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        private const val TAG = "BatteryMonitorSvc"
         private const val CHANNEL_ID = "battery_monitor"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_TOGGLE = "com.altmansoftwaredesign.hotspotwidget.action.TOGGLE"
