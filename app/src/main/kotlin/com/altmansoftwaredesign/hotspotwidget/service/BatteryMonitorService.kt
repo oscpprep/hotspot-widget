@@ -23,6 +23,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Keeps the widget's battery (and hotspot) reading live.
@@ -38,6 +40,9 @@ class BatteryMonitorService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var receiverRegistered = false
+
+    private val refreshMutex = Mutex()
+    private var lastRendered: Rendered? = null
 
     // Fires on battery changes (sticky) and on tethering changes from ANY source
     // — Quick Settings, Settings, another app, or Android auto-disabling it.
@@ -71,7 +76,10 @@ class BatteryMonitorService : Service() {
                 else -> Log.w(TAG, "Toggle request with no target state; ignoring")
             }
         } else {
-            refresh()
+            // An explicit start (widget tap, boot) redraws unconditionally: the
+            // widget may have been re-created and be showing the unknown default,
+            // in which case matching cached values must not suppress the draw.
+            scope.launch { doRefresh(force = true) }
         }
         return START_STICKY
     }
@@ -118,9 +126,22 @@ class BatteryMonitorService : Service() {
         scope.launch { doRefresh() }
     }
 
-    private suspend fun doRefresh() {
+    /**
+     * ACTION_BATTERY_CHANGED fires on voltage and temperature changes too, not
+     * just whole-percent steps, so most refreshes would redraw identical values.
+     * The mutex serializes reads (they hit the same reflection) and makes the
+     * cache check atomic.
+     */
+    private suspend fun doRefresh(force: Boolean = false) = refreshMutex.withLock {
         val battery = BatteryRepository(applicationContext).getBatteryState()
         val hotspotOn = HotspotRepository(applicationContext).getHotspotState().isEnabled
+
+        val rendered = Rendered(hotspotOn, battery.percentage)
+        if (!force && rendered == lastRendered) {
+            Log.v(TAG, "Nothing displayable changed; skipping redraw")
+            return@withLock
+        }
+        lastRendered = rendered
 
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.notify(
@@ -136,6 +157,9 @@ class BatteryMonitorService : Service() {
             HotspotWidgetProvider.updateAppWidget(applicationContext, appWidgetManager, id)
         }
     }
+
+    /** Everything the widget and notification actually display. */
+    private data class Rendered(val hotspotOn: Boolean?, val batteryPct: Int)
 
     private fun buildNotification(hotspotOn: Boolean?, batteryPct: Int?): Notification {
         val hotspotText = when (hotspotOn) {
