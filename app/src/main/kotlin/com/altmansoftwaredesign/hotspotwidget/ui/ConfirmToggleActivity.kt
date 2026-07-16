@@ -14,10 +14,15 @@ import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.service.BatteryMonitorService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ConfirmToggleActivity : Activity() {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var dialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,12 +32,21 @@ class ConfirmToggleActivity : Activity() {
         BatteryMonitorService.start(this)
 
         // Determine current state to phrase the dialog correctly.
-        CoroutineScope(Dispatchers.Main).launch {
+        scope.launch {
             val isEnabled = withContext(Dispatchers.IO) {
                 HotspotRepository(applicationContext).getHotspotState().isEnabled
             }
             if (isEnabled == null) showUnavailableDialog() else showDialog(isEnabled)
         }
+    }
+
+    override fun onDestroy() {
+        // Cancel first so a slow state read can't call showDialog on a dead
+        // window, then drop the dialog so it isn't leaked on rotation.
+        scope.cancel()
+        dialog?.dismiss()
+        dialog = null
+        super.onDestroy()
     }
 
     /**
@@ -41,7 +55,7 @@ class ConfirmToggleActivity : Activity() {
      * what the user intends, so the honest move is to say so and do nothing.
      */
     private fun showUnavailableDialog() {
-        AlertDialog.Builder(this)
+        dialog = AlertDialog.Builder(this)
             .setTitle(R.string.state_unavailable_title)
             .setMessage(R.string.state_unavailable_message)
             .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
@@ -61,7 +75,7 @@ class ConfirmToggleActivity : Activity() {
             getString(R.string.turn_on)
         }
 
-        AlertDialog.Builder(this)
+        dialog = AlertDialog.Builder(this)
             .setTitle(R.string.toggle_hotspot)
             .setMessage(messageRes)
             .setPositiveButton(confirmLabel) { _, _ ->

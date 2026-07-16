@@ -16,19 +16,24 @@
         android:gravity="center"
         android:orientation="vertical">
 
+        <!-- Defaults are the "unknown" state on purpose: this layout is what the
+             system shows before onUpdate has drawn real values. Defaulting to
+             "Hotspot Off" / "100%" would render a confident lie whenever the
+             update is delayed or lost. -->
         <ImageView
             android:id="@+id/hotspot_icon"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:contentDescription="@string/hotspot_status"
-            android:scaleType="centerInside" />
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_hotspot_unknown" />
 
         <TextView
             android:id="@+id/hotspot_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="@string/hotspot_off"
+            android:text="@string/hotspot_unknown"
             android:textColor="@color/widget_text"
             android:textSize="12sp" />
     </LinearLayout>
@@ -56,14 +61,15 @@
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:contentDescription="@string/battery_status"
-            android:scaleType="centerInside" />
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_battery_unknown" />
 
         <TextView
             android:id="@+id/battery_percentage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="100%"
+            android:text="@string/status_unknown"
             android:textColor="@color/widget_text"
             android:textSize="12sp" />
     </LinearLayout>

@@ -15,6 +15,7 @@ import com.altmansoftwaredesign.hotspotwidget.ui.ConfirmToggleActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class HotspotWidgetProvider : AppWidgetProvider() {
 
@@ -26,8 +27,19 @@ class HotspotWidgetProvider : AppWidgetProvider() {
         // Just draw the widgets. The live monitor is started from a user tap
         // (ConfirmToggleActivity) or BootReceiver — never from here, because
         // Android 12+ forbids starting a foreground service from a receiver.
-        for (appWidgetId in appWidgetIds) {
-            updateAppWidget(context, appWidgetManager, appWidgetId)
+        //
+        // goAsync() keeps the process alive until the draw finishes. Without it
+        // onReceive returns immediately and the work races process death, leaving
+        // the widget showing the static initialLayout instead of real values.
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                for (appWidgetId in appWidgetIds) {
+                    updateAppWidget(context, appWidgetManager, appWidgetId)
+                }
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 
@@ -37,12 +49,17 @@ class HotspotWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        fun updateAppWidget(
+        /**
+         * Draws one widget. Suspends until the draw is done so callers can keep
+         * the process alive for its duration — a fire-and-forget launch here would
+         * silently lose the update whenever the process is reclaimed first.
+         */
+        suspend fun updateAppWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
             appWidgetId: Int
         ) {
-            CoroutineScope(Dispatchers.IO).launch {
+            withContext(Dispatchers.IO) {
                 val hotspotRepo = HotspotRepository(context)
                 val batteryRepo = BatteryRepository(context)
 

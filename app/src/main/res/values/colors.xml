@@ -2,7 +2,7 @@
 <resources>
     <color name="hotspot_on">#4CAF50</color>
     <color name="hotspot_off">#9E9E9E</color>
-    <color name="hotspot_unknown">#FF9800</color>
+    <color name="state_unknown">#FF9800</color>
     <color name="battery_high">#4CAF50</color>
     <color name="battery_medium">#FF9800</color>
     <color name="battery_low">#F44336</color>

@@ -35,6 +35,9 @@
     <string name="setup_status_needed">✗ Permission not granted yet.</string>
     <string name="setup_grant_button">Grant permission</string>
 
+    <!-- Sample value shown only in the widget picker preview, never on a live widget. -->
+    <string name="preview_battery_sample">87%</string>
+
     <!-- About dialog -->
     <string name="about_version">Version %1$s\n\nAltman Software Design</string>
 </resources>
