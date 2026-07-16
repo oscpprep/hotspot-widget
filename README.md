@@ -16,7 +16,16 @@ when tapped.
 - **Live updates** — a small foreground service keeps the battery and hotspot
   readings current, including when the hotspot is changed from Quick Settings or
   elsewhere. Its required ongoing notification is made useful, showing
-  `Hotspot: On/Off · Battery NN%`.
+  `Hotspot: On/Off · Battery NN%`. Redraws are skipped when nothing displayed
+  actually changed, so the frequent battery broadcasts stay cheap.
+- **Never guesses** — the hotspot state is read through a hidden API that a
+  future Android release may change. If it can't be read, the widget shows an
+  amber `?` and `Hotspot —` rather than claiming "off", the notification shows
+  `Hotspot: —`, and tapping explains that the state is unavailable instead of
+  offering a toggle that might do the opposite of what you intend. The same
+  applies before the first draw completes.
+- **Follows the device theme** — light and dark surfaces; status colours stay
+  constant across both.
 
 ## Requirements
 
@@ -54,15 +63,18 @@ shows a small setup screen with the current permission status.)
 
 ## Architecture
 
-- **HotspotWidgetProvider** — draws the widget; starts the monitor only from
-  allowed contexts (Android 12+ forbids starting a foreground service from a
-  broadcast receiver), and stops it in `onDisabled`
+- **HotspotWidgetProvider** — draws the widget inside `goAsync()` so the draw
+  can't be lost to process death; never starts the monitor itself (Android 12+
+  forbids starting a foreground service from a broadcast receiver), and stops it
+  in `onDisabled`
 - **ConfirmToggleActivity** — transparent dialog activity; checks WRITE_SETTINGS,
   then drives the toggle through the service (a widget tap is an allowed
   foreground-service start context)
 - **BatteryMonitorService** — foreground service; listens for
-  `ACTION_BATTERY_CHANGED` and `TETHER_STATE_CHANGED`, refreshes the widget and
-  notification, and performs the actual toggle
+  `ACTION_BATTERY_CHANGED` and `TETHER_STATE_CHANGED` (registered `EXPORTED` —
+  both are protected system broadcasts, and `NOT_EXPORTED` makes the platform
+  drop them), refreshes the widget and notification, and drives the hotspot to
+  the state the confirm dialog asked for
 - **HotspotRepository** — reflects into `TetheringManager.startTethering` /
   `stopTethering` (callback supplied via a `Proxy`) and reads live state via
   `getTetheredIfaces()`
@@ -73,6 +85,19 @@ shows a small setup screen with the current permission status.)
 
 Horizontal 3×1 widget: hotspot icon + status on the left, vertical divider,
 battery icon + percentage on the right.
+
+`widget_layout` is the live widget and defaults to the unknown state, since it
+is what the system shows before a draw lands. `widget_preview` is the picker
+preview only and carries illustrative sample values; keep the two in step
+visually.
+
+### Known limitations
+
+- The monitor starts on the first widget tap or at boot, not when the widget is
+  placed, because Android 12+ won't let a receiver start a foreground service.
+  Between an app update and the next tap, readings can go stale.
+- `POST_NOTIFICATIONS` is requested on Android 13+ but has only been exercised
+  on Android 12 hardware, where the request correctly no-ops.
 
 ## Future ideas
 
