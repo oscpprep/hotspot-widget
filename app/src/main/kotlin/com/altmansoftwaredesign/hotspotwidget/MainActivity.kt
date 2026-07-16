@@ -12,6 +12,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.altmansoftwaredesign.hotspotwidget.util.appVersionName
 
 /**
  * Small first-run / setup screen. The app is driven entirely from the home-screen
@@ -33,6 +34,9 @@ class MainActivity : AppCompatActivity() {
         requestNotificationPermissionIfNeeded()
 
         statusView = findViewById(R.id.permission_status)
+        findViewById<TextView>(R.id.version_info).text =
+            getString(R.string.setup_version, appVersionName())
+
         grantButton = findViewById(R.id.grant_button)
         grantButton.setOnClickListener {
             startActivity(

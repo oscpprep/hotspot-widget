@@ -34,6 +34,7 @@
     <string name="setup_status_granted">✓ Permission granted — you\'re all set.</string>
     <string name="setup_status_needed">✗ Permission not granted yet.</string>
     <string name="setup_grant_button">Grant permission</string>
+    <string name="setup_version">Hotspot Widget %1$s · Altman Software Design</string>
 
     <!-- Sample value shown only in the widget picker preview, never on a live widget. -->
     <string name="preview_battery_sample">87%</string>

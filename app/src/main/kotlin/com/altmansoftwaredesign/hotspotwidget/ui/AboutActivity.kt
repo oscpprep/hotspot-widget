@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
 import com.altmansoftwaredesign.hotspotwidget.R
+import com.altmansoftwaredesign.hotspotwidget.util.appVersionName
 
 /**
  * Tiny transparent dialog shown when the battery side of the widget is tapped.
@@ -14,15 +15,9 @@ class AboutActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val version = try {
-            packageManager.getPackageInfo(packageName, 0).versionName
-        } catch (_: Exception) {
-            "?"
-        }
-
         AlertDialog.Builder(this)
             .setTitle(R.string.app_name)
-            .setMessage(getString(R.string.about_version, version))
+            .setMessage(getString(R.string.about_version, appVersionName()))
             .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
             .setOnCancelListener { finish() }
             .show()
