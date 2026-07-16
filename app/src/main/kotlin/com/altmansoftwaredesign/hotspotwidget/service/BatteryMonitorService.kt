@@ -32,9 +32,13 @@ import kotlinx.coroutines.sync.withLock
  * ACTION_BATTERY_CHANGED cannot be declared in the manifest on Android 8+, so we
  * register it at runtime from a foreground service. The service's ongoing
  * notification — required for any foreground service — is made useful by showing
- * the current hotspot/battery status. The service is started when the first
- * widget is added and stopped when the last one is removed (see
- * [HotspotWidgetProvider.onEnabled] / onDisabled), so it never outlives the widget.
+ * the current hotspot/battery status.
+ *
+ * It starts on the first widget tap or at boot, NOT when the widget is placed:
+ * Android 12+ forbids starting a foreground service from a broadcast receiver,
+ * which is the only context onUpdate/onEnabled run in. It stops when the last
+ * widget is removed ([HotspotWidgetProvider.onDisabled]), so it never outlives
+ * the widget.
  */
 class BatteryMonitorService : Service() {
 

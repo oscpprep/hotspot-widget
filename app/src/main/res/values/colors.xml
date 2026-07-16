@@ -6,8 +6,6 @@
     <color name="battery_high">#4CAF50</color>
     <color name="battery_medium">#FF9800</color>
     <color name="battery_low">#F44336</color>
-    <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
     <color name="widget_background">#FAFAFA</color>
     <color name="widget_text">#1A1A1A</color>
     <color name="divider">#E0E0E0</color>

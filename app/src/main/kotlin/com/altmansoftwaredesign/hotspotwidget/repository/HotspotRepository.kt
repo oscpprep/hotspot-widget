@@ -11,12 +11,6 @@ import java.lang.reflect.Proxy
 import java.util.concurrent.Executor
 import kotlin.time.Duration.Companion.seconds
 
-interface IHotspotRepository {
-    suspend fun getHotspotState(): HotspotState
-    suspend fun enableHotspot(): Boolean
-    suspend fun disableHotspot(): Boolean
-}
-
 /**
  * Toggles and queries the Wi-Fi hotspot.
  *
@@ -26,24 +20,24 @@ interface IHotspotRepository {
  * This is inherently fragile — the hidden signatures may change in future Android
  * releases — hence the suppressed reflection/spell-check warnings.
  */
-class HotspotRepository(context: Context) : IHotspotRepository {
+class HotspotRepository(context: Context) {
     private val appContext = context.applicationContext
     private val connectivityManager =
         appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     @SuppressLint("MissingPermission")
-    override suspend fun getHotspotState(): HotspotState {
+    suspend fun getHotspotState(): HotspotState {
         return try {
             HotspotState(isEnabled = isHotspotEnabled())
         } catch (e: Exception) {
             // Unknown, NOT off. Reporting "off" here would be a confident lie the
             // moment the hidden API changes under us.
             Log.w("HotspotRepo", "Could not read hotspot state", e)
-            HotspotState(isEnabled = null, error = e.message ?: e.javaClass.simpleName)
+            HotspotState(isEnabled = null)
         }
     }
 
-    override suspend fun enableHotspot(): Boolean {
+    suspend fun enableHotspot(): Boolean {
         return try {
             startWifiTethering()
             delay(1.seconds)
@@ -54,7 +48,7 @@ class HotspotRepository(context: Context) : IHotspotRepository {
         }
     }
 
-    override suspend fun disableHotspot(): Boolean {
+    suspend fun disableHotspot(): Boolean {
         return try {
             stopWifiTethering()
             delay(1.seconds)
