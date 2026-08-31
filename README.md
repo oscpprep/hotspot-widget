@@ -9,7 +9,11 @@ when tapped.
 - **Compact horizontal widget** — hotspot status on the left, battery on the
   right, separated by a divider; resizable
 - **Hotspot status** — on/off, with icon
-- **Battery percentage** — with a colour indicator (green/orange/red by level)
+- **Battery percentage** — with a colour indicator (green/orange/red by level),
+  plus a charging badge (a bolt in a dark disc) on the icon corner while the
+  device is charging (or full). The badge is neutral, not hue-coded, so it
+  reads on any battery-level colour, in light or dark, and for red-green
+  colour-blind users
 - **Tap to toggle** — tapping the widget opens a confirmation dialog before
   changing the hotspot; the dialog wording adapts to the current state
   (“Turn on?” / “Turn off?”)
@@ -78,7 +82,7 @@ shows a small setup screen with the current permission status.)
 - **HotspotRepository** — reflects into `TetheringManager.startTethering` /
   `stopTethering` (callback supplied via a `Proxy`) and reads live state via
   `getTetheredIfaces()`
-- **BatteryRepository** — reads battery level/status
+- **BatteryRepository** — reads battery level and charging status
 - **BootReceiver** — restarts the monitor on boot if a widget exists
 
 ### Layout

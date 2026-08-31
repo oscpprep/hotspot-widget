@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.view.View
 import android.widget.RemoteViews
 import com.altmansoftwaredesign.hotspotwidget.R
 import com.altmansoftwaredesign.hotspotwidget.repository.BatteryRepository
@@ -90,6 +91,10 @@ class HotspotWidgetProvider : AppWidgetProvider() {
                     else -> R.drawable.ic_battery_low
                 }
                 views.setImageViewResource(R.id.battery_icon, batteryIconRes)
+                views.setViewVisibility(
+                    R.id.battery_charging_bolt,
+                    if (batteryState.isCharging) View.VISIBLE else View.GONE
+                )
                 views.setTextViewText(
                     R.id.battery_percentage,
                     "${batteryState.percentage}%"

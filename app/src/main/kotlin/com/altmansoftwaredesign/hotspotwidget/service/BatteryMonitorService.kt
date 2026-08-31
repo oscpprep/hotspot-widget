@@ -140,7 +140,7 @@ class BatteryMonitorService : Service() {
         val battery = BatteryRepository(applicationContext).getBatteryState()
         val hotspotOn = HotspotRepository(applicationContext).getHotspotState().isEnabled
 
-        val rendered = Rendered(hotspotOn, battery.percentage)
+        val rendered = Rendered(hotspotOn, battery.percentage, battery.isCharging)
         if (!force && rendered == lastRendered) {
             Log.v(TAG, "Nothing displayable changed; skipping redraw")
             return@withLock
@@ -162,8 +162,16 @@ class BatteryMonitorService : Service() {
         }
     }
 
-    /** Everything the widget and notification actually display. */
-    private data class Rendered(val hotspotOn: Boolean?, val batteryPct: Int)
+    /**
+     * Everything the widget and notification actually display. [charging] is here
+     * so a plug/unplug event still forces a redraw even when the percentage and
+     * hotspot state are unchanged.
+     */
+    private data class Rendered(
+        val hotspotOn: Boolean?,
+        val batteryPct: Int,
+        val charging: Boolean
+    )
 
     private fun buildNotification(hotspotOn: Boolean?, batteryPct: Int?): Notification {
         val hotspotText = when (hotspotOn) {

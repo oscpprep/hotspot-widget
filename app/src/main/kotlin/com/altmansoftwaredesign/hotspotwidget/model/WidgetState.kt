@@ -8,4 +8,4 @@ package com.altmansoftwaredesign.hotspotwidget.model
  */
 data class HotspotState(val isEnabled: Boolean?)
 
-data class BatteryState(val percentage: Int)
+data class BatteryState(val percentage: Int, val isCharging: Boolean = false)

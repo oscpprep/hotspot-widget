@@ -16,6 +16,19 @@ class BatteryRepository(private val context: Context) {
 
         val level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-        return BatteryState(percentage = (level.coerceAtLeast(0) * 100) / scale.coerceAtLeast(1))
+
+        // BATTERY_STATUS_FULL counts as charging: a plugged-in phone sitting at
+        // 100% still reports FULL rather than CHARGING, and the bolt should stay.
+        val status = batteryStatus.getIntExtra(
+            BatteryManager.EXTRA_STATUS,
+            BatteryManager.BATTERY_STATUS_UNKNOWN
+        )
+        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+            status == BatteryManager.BATTERY_STATUS_FULL
+
+        return BatteryState(
+            percentage = (level.coerceAtLeast(0) * 100) / scale.coerceAtLeast(1),
+            isCharging = isCharging
+        )
     }
 }

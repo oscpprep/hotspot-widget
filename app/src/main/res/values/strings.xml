@@ -6,6 +6,7 @@
     <string name="hotspot_unknown">Hotspot —</string>
     <string name="hotspot_status">Hotspot Status</string>
     <string name="battery_status">Battery Status</string>
+    <string name="battery_charging">Charging</string>
     <string name="toggle_hotspot">Toggle Hotspot</string>
     <string name="confirm_turn_on">Turn the hotspot on?</string>
     <string name="confirm_turn_off">Turn the hotspot off?</string>

@@ -49,12 +49,25 @@
         android:gravity="center"
         android:orientation="vertical">
 
-        <ImageView
+        <!-- Structure mirrors widget_layout; the sample shows the charging badge. -->
+        <FrameLayout
             android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:contentDescription="@string/battery_status"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_battery_high" />
+            android:layout_height="32dp">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="@string/battery_status"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_battery_high" />
+
+            <ImageView
+                android:layout_width="15dp"
+                android:layout_height="15dp"
+                android:layout_gravity="bottom|end"
+                android:contentDescription="@string/battery_charging"
+                android:src="@drawable/ic_charging_bolt" />
+        </FrameLayout>
 
         <TextView
             android:layout_width="wrap_content"
