@@ -29,9 +29,16 @@ object Api36TetheringObserver {
 
         val callback = object : TetheringManager.TetheringEventCallback {
             override fun onTetheredInterfacesChanged(interfaces: MutableSet<TetheringInterface>) {
-                val wifiIsTethered = interfaces.any {
-                    it.type == TetheringManager.TETHERING_WIFI
+                val interfaceDetails = interfaces.map {
+                    "${it.getType()}:${it.getInterface()}"
                 }
+                val wifiIsTethered = interfaces.any {
+                    it.getType() == TetheringManager.TETHERING_WIFI
+                }
+                android.util.Log.i(
+                    "Api36TetheringObserver",
+                    "Tethered interfaces=$interfaceDetails; Wi-Fi active=$wifiIsTethered"
+                )
                 onStateChanged(wifiIsTethered)
             }
         }
