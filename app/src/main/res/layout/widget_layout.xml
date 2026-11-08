@@ -1,94 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:gravity="center"
-    android:orientation="horizontal"
-    android:padding="12dp">
+    android:padding="8dp">
 
-    <!-- Hotspot Status Section -->
-    <LinearLayout
-        android:layout_width="0dp"
+    <Switch
+        android:id="@+id/hotspot_switch"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:orientation="vertical">
+        android:contentDescription="@string/hotspot_accessibility_unknown"
+        android:gravity="center_vertical"
+        android:minHeight="64dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:scaleX="1.16"
+        android:scaleY="1.16"
+        android:showText="true"
+        android:splitTrack="false"
+        android:textColor="@color/widget_text"
+        android:textOff="@string/hotspot_off"
+        android:textOn="@string/hotspot_on"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:thumbTint="@color/hotspot_switch_thumb"
+        android:trackTint="@color/hotspot_switch_track" />
 
-        <!-- Defaults are the "unknown" state on purpose: this layout is what the
-             system shows before onUpdate has drawn real values. Defaulting to
-             "Hotspot Off" / "100%" would render a confident lie whenever the
-             update is delayed or lost. -->
-        <ImageView
-            android:id="@+id/hotspot_icon"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:contentDescription="@string/hotspot_status"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_hotspot_unknown" />
-
-        <TextView
-            android:id="@+id/hotspot_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/hotspot_unknown"
-            android:textColor="@color/widget_text"
-            android:textSize="12sp" />
-    </LinearLayout>
-
-    <!-- Divider -->
-    <ImageView
-        android:layout_width="1dp"
-        android:layout_height="match_parent"
-        android:layout_marginHorizontal="4dp"
-        android:background="@color/divider"
-        android:contentDescription="@null"
-        android:importantForAccessibility="no" />
-
-    <!-- Battery Status Section (tapping shows the About dialog) -->
-    <LinearLayout
-        android:id="@+id/battery_section"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:orientation="vertical">
-
-        <!-- The charging badge sits on the bottom-end corner of the battery
-             icon; it stays gone until BatteryRepository reports a charging/full
-             status. -->
-        <FrameLayout
-            android:layout_width="32dp"
-            android:layout_height="32dp">
-
-            <ImageView
-                android:id="@+id/battery_icon"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:contentDescription="@string/battery_status"
-                android:scaleType="centerInside"
-                android:src="@drawable/ic_battery_unknown" />
-
-            <ImageView
-                android:id="@+id/battery_charging_bolt"
-                android:layout_width="15dp"
-                android:layout_height="15dp"
-                android:layout_gravity="bottom|end"
-                android:contentDescription="@string/battery_charging"
-                android:src="@drawable/ic_charging_bolt"
-                android:visibility="gone" />
-        </FrameLayout>
-
-        <TextView
-            android:id="@+id/battery_percentage"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/status_unknown"
-            android:textColor="@color/widget_text"
-            android:textSize="12sp" />
-    </LinearLayout>
-
-</LinearLayout>
+</FrameLayout>
