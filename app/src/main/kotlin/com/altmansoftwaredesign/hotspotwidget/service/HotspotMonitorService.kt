@@ -45,7 +45,7 @@ class HotspotMonitorService : Service() {
             }
             Log.i(TAG, "Legacy tether event ${intent.action}: state=$state")
             if (state != null) {
-                setCachedState(state)
+                Companion.recordState(state)
                 HotspotWidgetProvider.updateWidgets(
                     this@HotspotMonitorService,
                     hotspotStateOverride = state
@@ -218,7 +218,7 @@ class HotspotMonitorService : Service() {
 
         fun currentState(): Boolean? = cachedHotspotState
 
-        private fun setCachedState(state: Boolean) {
+        fun recordState(state: Boolean) {
             cachedHotspotState = state
         }
 
