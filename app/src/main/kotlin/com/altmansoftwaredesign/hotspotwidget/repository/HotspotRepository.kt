@@ -4,32 +4,65 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.ConnectivityManager
+import android.net.TetheringInterface
+import android.net.TetheringManager
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 
 /**
  * Read-only hotspot state detection.
  *
- * Primary source: WifiManager#getWifiApState, which returns the current AP
- * state synchronously. This avoids relying on a possibly stale sticky broadcast.
- *
- * Fallbacks: the Wi-Fi AP state broadcast, tether-state broadcast, and active
- * tethered-interface list.
+ * Android 16 / API 36 has a public TetheringManager callback that reports the
+ * actual tethered interface set. Use it from widget/activity callers on API 36.
+ * Older Android versions retain the best-effort legacy Wi-Fi AP/tether checks.
  */
 class HotspotRepository(context: Context) {
     private val appContext = context.applicationContext
     private val connectivityManager =
         appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val wifiManager =
-        appContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        appContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
     fun isHotspotEnabled(): Boolean? {
-        // Query the current state first. Sticky broadcasts can contain an old
-        // value on some OEM builds and must never override the live system state.
+        if (Build.VERSION.SDK_INT >= 36) {
+            Log.d(TAG, "Use registerTetheringEventCallback for API 36 state reads")
+        }
         readStateFromWifiManager()?.let { return it }
         readStateFromStickyWifiApBroadcast()?.let { return it }
         readStateFromStickyTetherBroadcast()?.let { return it }
         return readStateFromLegacyFallback()
+    }
+
+    /**
+     * Register the public API 36 tethering callback. The callback immediately
+     * receives the current tethered-interface set and subsequently receives
+     * changes. The caller must invoke the returned close function.
+     */
+    @RequiresApi(36)
+    fun registerPublicTetheringCallback(onStateChanged: (Boolean) -> Unit): () -> Unit {
+        val manager = appContext.getSystemService(TetheringManager::class.java)
+            ?: throw IllegalStateException("TetheringManager is unavailable")
+
+        val callback = object : TetheringManager.TetheringEventCallback {
+            override fun onTetheredInterfacesChanged(interfaces: Set<TetheringInterface>) {
+                val wifiIsTethered = interfaces.any {
+                    it.type == TetheringManager.TETHERING_WIFI
+                }
+                Log.i(TAG, "API 36 TetheringManager interfaces=$interfaces wifi=$wifiIsTethered")
+                onStateChanged(wifiIsTethered)
+            }
+        }
+
+        manager.registerTetheringEventCallback(appContext.mainExecutor, callback)
+        return {
+            try {
+                manager.unregisterTetheringEventCallback(callback)
+            } catch (e: Exception) {
+                Log.d(TAG, "Could not unregister TetheringManager callback", e)
+            }
+        }
     }
 
     fun parseWifiApStateIntent(intent: Intent): Boolean? {
@@ -112,7 +145,6 @@ class HotspotRepository(context: Context) {
     private fun stateToBoolean(state: Int): Boolean? = when (state) {
         WIFI_AP_STATE_ENABLED -> true
         WIFI_AP_STATE_DISABLED, WIFI_AP_STATE_DISABLING, WIFI_AP_STATE_FAILED -> false
-        // Do not momentarily flip the UI while the access point is transitioning.
         WIFI_AP_STATE_ENABLING, STATE_UNKNOWN -> null
         else -> null
     }
