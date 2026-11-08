@@ -11,11 +11,7 @@ import com.altmansoftwaredesign.hotspotwidget.R
 import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.ui.HotspotSettingsActivity
 
-/**
- * A single large switch. The switch is a shortcut into Android/Samsung's own
- * hotspot Settings UI; the app never attempts to change tethering behind the
- * system UI's back.
- */
+/** Minimal hotspot card with a custom, state-aware slider. */
 class HotspotWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(
@@ -45,21 +41,48 @@ class HotspotWidgetProvider : AppWidgetProvider() {
             val hotspotState = HotspotRepository(context).isHotspotEnabled()
             val views = RemoteViews(context.packageName, R.layout.widget_layout)
 
-            // Switch widgets are stateful RemoteViews on Android 12+.
-            // Unknown is shown as off visually, but its description says unknown.
-            views.setCompoundButtonChecked(R.id.hotspot_switch, hotspotState == true)
-            views.setContentDescription(
-                R.id.hotspot_switch,
-                when (hotspotState) {
-                    true -> context.getString(R.string.hotspot_accessibility_on)
-                    false -> context.getString(R.string.hotspot_accessibility_off)
-                    null -> context.getString(R.string.hotspot_accessibility_unknown)
+            when (hotspotState) {
+                true -> {
+                    views.setTextViewText(R.id.hotspot_state, context.getString(R.string.hotspot_on))
+                    views.setTextColor(R.id.hotspot_state, context.getColor(R.color.widget_state_on))
+                    views.setViewVisibility(R.id.switch_track_on, android.view.View.VISIBLE)
+                    views.setViewVisibility(R.id.switch_track_off, android.view.View.GONE)
+                    views.setViewVisibility(R.id.switch_thumb_on, android.view.View.VISIBLE)
+                    views.setViewVisibility(R.id.switch_thumb_off, android.view.View.GONE)
+                    views.setContentDescription(
+                        R.id.widget_root,
+                        context.getString(R.string.hotspot_accessibility_on)
+                    )
                 }
-            )
+                false -> {
+                    views.setTextViewText(R.id.hotspot_state, context.getString(R.string.hotspot_off))
+                    views.setTextColor(R.id.hotspot_state, context.getColor(R.color.widget_state_off))
+                    views.setViewVisibility(R.id.switch_track_on, android.view.View.GONE)
+                    views.setViewVisibility(R.id.switch_track_off, android.view.View.VISIBLE)
+                    views.setViewVisibility(R.id.switch_thumb_on, android.view.View.GONE)
+                    views.setViewVisibility(R.id.switch_thumb_off, android.view.View.VISIBLE)
+                    views.setContentDescription(
+                        R.id.widget_root,
+                        context.getString(R.string.hotspot_accessibility_off)
+                    )
+                }
+                null -> {
+                    views.setTextViewText(R.id.hotspot_state, context.getString(R.string.hotspot_state_unknown))
+                    views.setTextColor(R.id.hotspot_state, context.getColor(R.color.widget_state_unknown))
+                    views.setViewVisibility(R.id.switch_track_on, android.view.View.GONE)
+                    views.setViewVisibility(R.id.switch_track_off, android.view.View.VISIBLE)
+                    views.setViewVisibility(R.id.switch_thumb_on, android.view.View.GONE)
+                    views.setViewVisibility(R.id.switch_thumb_off, android.view.View.VISIBLE)
+                    views.setContentDescription(
+                        R.id.widget_root,
+                        context.getString(R.string.hotspot_accessibility_unknown)
+                    )
+                }
+            }
 
-            // The mutable PendingIntent allows RemoteViews to add EXTRA_CHECKED.
-            // HotspotSettingsActivity deliberately does not use that value to
-            // flip tethering; it opens the system-owned control instead.
+            // The whole card is one large hit target. It opens the system-owned
+            // hotspot page; it does not pretend this third-party widget can toggle
+            // Samsung's privileged switch itself.
             val intent = Intent(context, HotspotSettingsActivity::class.java).apply {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             }
@@ -67,12 +90,9 @@ class HotspotWidgetProvider : AppWidgetProvider() {
                 context,
                 appWidgetId,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            views.setOnCheckedChangeResponse(
-                R.id.hotspot_switch,
-                RemoteViews.RemoteResponse.fromPendingIntent(pendingIntent)
-            )
+            views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
 
             manager.updateAppWidget(appWidgetId, views)
         }
