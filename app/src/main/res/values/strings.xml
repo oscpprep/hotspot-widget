@@ -1,45 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Hotspot Widget</string>
-    <string name="hotspot_on">Hotspot On</string>
-    <string name="hotspot_off">Hotspot Off</string>
-    <string name="hotspot_unknown">Hotspot —</string>
-    <string name="hotspot_status">Hotspot Status</string>
-    <string name="battery_status">Battery Status</string>
-    <string name="battery_charging">Charging</string>
-    <string name="toggle_hotspot">Toggle Hotspot</string>
-    <string name="confirm_turn_on">Turn the hotspot on?</string>
-    <string name="confirm_turn_off">Turn the hotspot off?</string>
-    <string name="turn_on">Turn On</string>
-    <string name="turn_off">Turn Off</string>
-    <string name="cancel">Cancel</string>
-
-    <!-- Shown when the hotspot state can't be read, so a toggle can't be offered safely. -->
-    <string name="state_unavailable_title">Hotspot state unavailable</string>
-    <string name="state_unavailable_message">This device isn\'t reporting its hotspot state, so the widget won\'t guess at it. Use Quick Settings to change the hotspot.</string>
-
-    <!-- Foreground service notification -->
-    <string name="notification_channel_name">Battery &amp; hotspot status</string>
-    <string name="notification_channel_desc">Keeps the widget\'s battery and hotspot reading up to date.</string>
-    <string name="notification_status">Hotspot: %1$s · Battery %2$s</string>
-    <string name="status_on">On</string>
-    <string name="status_off">Off</string>
-    <!-- Shown when a reading is genuinely unavailable — never as a stand-in for a real value. -->
-    <string name="status_unknown">—</string>
-    <string name="grant_write_settings">Allow “Modify system settings”, then tap the widget again to toggle the hotspot.</string>
-
-    <!-- Setup screen -->
-    <string name="setup_intro">Add the Hotspot Widget to your home screen (long-press the home screen → Widgets), then tap it to toggle your Wi-Fi hotspot. The widget also shows your battery level, kept live by a quiet ongoing notification.</string>
-    <string name="setup_permission_heading">One-time permission</string>
-    <string name="setup_permission_body">Toggling the hotspot needs the “Modify system settings” permission. Grant it once and the widget can turn tethering on and off.</string>
-    <string name="setup_status_granted">✓ Permission granted — you\'re all set.</string>
-    <string name="setup_status_needed">✗ Permission not granted yet.</string>
-    <string name="setup_grant_button">Grant permission</string>
-    <string name="setup_version">Hotspot Widget %1$s · Altman Software Design</string>
-
-    <!-- Sample value shown only in the widget picker preview, never on a live widget. -->
-    <string name="preview_battery_sample">87%</string>
-
-    <!-- About dialog -->
-    <string name="about_version">Version %1$s\n\nAltman Software Design</string>
+    <string name="app_name">Hotspot Switch</string>
+    <string name="hotspot_on">HOTSPOT ON</string>
+    <string name="hotspot_off">HOTSPOT OFF</string>
+    <string name="hotspot_accessibility_on">Hotspot is on. Tap to open system hotspot controls.</string>
+    <string name="hotspot_accessibility_off">Hotspot is off. Tap to open system hotspot controls.</string>
+    <string name="hotspot_accessibility_unknown">Hotspot state unavailable. Tap to open system hotspot controls.</string>
+    <string name="widget_description">One large switch that opens your phone's built-in Mobile Hotspot controls.</string>
+    <string name="open_settings_manually">Open Settings → Connections → Mobile Hotspot and Tethering → Mobile Hotspot.</string>
+    <string name="setup_title">One switch. System controls.</string>
+    <string name="setup_body">Add the Hotspot Switch to your home screen. Tap the large switch to open Android or Samsung's own Mobile Hotspot screen, then use the switch there to turn your hotspot on or off. Return to your home screen and this widget will refresh its state.</string>
+    <string name="setup_version">Hotspot Switch %1$s</string>
 </resources>
