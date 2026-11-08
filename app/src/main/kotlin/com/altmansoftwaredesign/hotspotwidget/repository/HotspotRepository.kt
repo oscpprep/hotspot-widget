@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.util.Log
 import com.altmansoftwaredesign.hotspotwidget.model.HotspotState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
@@ -68,6 +69,8 @@ class HotspotRepository(context: Context) {
                     "Android accepted the request, but this app could not verify that the hotspot became active."
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "enableHotspot failed", e)
             ToggleResult(false, "Could not start the hotspot: ${describeException(e)}")
@@ -88,6 +91,8 @@ class HotspotRepository(context: Context) {
                     "Android accepted the stop request, but this app could not verify that the hotspot turned off."
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "disableHotspot failed", e)
             ToggleResult(false, "Could not stop the hotspot: ${describeException(e)}")
