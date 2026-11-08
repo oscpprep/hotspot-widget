@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.HotspotWidget" parent="Theme.MaterialComponents.DayNight">
+    <style name="Theme.HotspotWidget" parent="Theme.AppCompat.DayNight">
         <item name="colorPrimary">@color/hotspot_on</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-        <item name="colorSecondary">@color/battery_medium</item>
-        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorPrimaryDark">@color/hotspot_on</item>
+        <item name="colorAccent">@color/hotspot_on</item>
     </style>
 
-    <style name="Theme.HotspotWidget.Transparent" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+    <style name="Theme.HotspotWidget.Transparent" parent="Theme.AppCompat.DayNight.Dialog.Alert">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowNoTitle">true</item>
-        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
     </style>
 </resources>
