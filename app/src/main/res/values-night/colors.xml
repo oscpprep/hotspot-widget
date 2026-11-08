@@ -1,10 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Dark-theme surface for the widget. The status colours (hotspot_on,
-         battery_*, state_unknown) are deliberately unchanged: they already meet
-         contrast on both surfaces and carry meaning, so they should read the
-         same in either theme. -->
-    <color name="widget_background">#212121</color>
-    <color name="widget_text">#ECECEC</color>
-    <color name="divider">#4A4A4A</color>
+    <!-- The widget uses a fixed high-contrast dark card in both device themes. -->
 </resources>
