@@ -1,14 +1,22 @@
 # Troubleshooting and compatibility
 
-## Widget says OFF while Mobile Hotspot is ON
+## Widget updates late or remains stale
 
-1. Confirm that the phone's system Mobile Hotspot switch is ON.
-2. Tap the widget to open native hotspot Settings and allow the page to load.
-3. Return to the home screen rather than leaving the helper Activity running in Recents.
-4. Give Android a moment to report the final tethering state.
-5. If the widget still shows OFF, remove the widget and add it again, then test once more.
+Version 1.4.0 adds a persistent foreground monitor on Android 16.
 
-On Android 16, the app listens for the public tethering-interface state callback while the system Settings page is open. Version 1.3.9 fixed a lifecycle bug where the helper Activity could finish too early and unregister that callback before the user changed the hotspot.
+1. Install the latest APK.
+2. Remove and re-add the widget if you are upgrading from an earlier version.
+3. Confirm the **Hotspot Switch is monitoring** notification is present (unless Android notification settings suppress it).
+4. Turn Mobile Hotspot ON or OFF from Samsung Settings or Quick Settings.
+5. Check whether the widget changes.
+
+The service keeps Android's public `TetheringManager.TetheringEventCallback` registered independently of the Settings helper Activity. Each interface-state callback directly updates all widget instances. It does not rely on a short-lived one-shot callback or periodic polling.
+
+If you force-stop the app, reboot the phone, or Android/Samsung stops the service, tap the widget once to start the monitor again. The service uses `START_STICKY` so Android can recreate it after normal process reclamation, but a force-stop prevents automatic restart until the user interacts with the app again.
+
+## Monitor notification is not visible
+
+The service requires an ongoing foreground-service notification. It uses a low-importance channel and is silent. On Android 13 or later, notification permission/channel settings can affect how it appears in the notification drawer; check **Settings → Apps → Hotspot Switch → Notifications**. Android may still show foreground-service activity in its active-apps/task-manager UI.
 
 ## Widget does not appear or says "Couldn't add widget"
 
@@ -30,8 +38,8 @@ This is expected behavior. The widget opens Samsung/Android's native hotspot Set
 
 | Android version | Detection path | Notes |
 |---|---|---|
-| Android 16 (API 36) | Public `TetheringManager.TetheringEventCallback` | Preferred path. Tested on Samsung Galaxy S24 with Hotspot Switch 1.3.9. |
-| Android 12–15 (API 31–35) | Legacy Wi-Fi AP/tethering state fallbacks | OEM-dependent; behavior can vary. |
+| Android 16 (API 36) | Persistent public `TetheringManager.TetheringEventCallback` | Preferred event-driven path. |
+| Android 12–15 (API 31–35) | Dynamic Wi-Fi AP/tether-state broadcast receiver and legacy state reads | OEM-dependent; behavior can vary. |
 
 ## Check the build version
 
@@ -44,8 +52,8 @@ When reporting an issue, include:
 - Device manufacturer and model.
 - Android version and One UI/OEM software version.
 - Hotspot Switch app version.
-- Whether the widget opens native hotspot Settings.
-- Whether the widget changes after you switch hotspot ON/OFF and return.
+- Whether the monitoring notification is present.
+- Whether the widget changes after you switch hotspot ON/OFF.
 - A screenshot or short screen recording that shows both the system hotspot state and widget state.
 
 Do not post private Wi-Fi passwords, hotspot passwords, or personal information in an issue.
