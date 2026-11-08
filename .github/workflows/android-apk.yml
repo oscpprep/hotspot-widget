@@ -9,6 +9,7 @@ on:
       - main
   workflow_dispatch:
 
+# The build job is read-only. Only the release job receives contents: write.
 permissions:
   contents: read
 
@@ -21,10 +22,26 @@ jobs:
     name: Build debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.app_version.outputs.version }}
 
     steps:
       - name: Check out source
         uses: actions/checkout@v7
+
+      - name: Read app version
+        id: app_version
+        shell: bash
+        run: |
+          VERSION="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          if [[ -z "$VERSION" ]]; then
+            echo "Could not read versionName from app/build.gradle.kts"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building Hotspot Switch $VERSION"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
@@ -47,30 +64,108 @@ jobs:
           set -o pipefail
           ./gradlew --no-daemon --stacktrace clean assembleDebug 2>&1 | tee build.log
 
-      - name: Verify APK and create checksum
+      - name: Package APK and create checksum
         if: success()
+        env:
+          VERSION: ${{ steps.app_version.outputs.version }}
         shell: bash
         run: |
+          set -euo pipefail
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          sha256sum "$APK" | tee app/build/outputs/apk/debug/SHA256SUMS.txt
+
+          mkdir -p dist
+          cp "$APK" dist/hotspot-switch.apk
+          cp "$APK" "dist/hotspot-switch-$VERSION.apk"
+          (
+            cd dist
+            sha256sum hotspot-switch.apk > hotspot-switch.SHA256SUMS.txt
+          )
+
+          echo "Prepared Hotspot Switch $VERSION release files:"
+          ls -lh dist/
 
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: hotspot-widget-build-log
+          name: hotspot-switch-build-log
           path: build.log
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Upload APK
+      - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v7
         with:
-          name: hotspot-widget-debug-apk
-          path: |
-            app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/apk/debug/SHA256SUMS.txt
+          name: hotspot-switch-${{ steps.app_version.outputs.version }}-apk
+          path: dist/*
           if-no-files-found: error
           retention-days: 30
+
+  publish-release:
+    name: Publish downloadable GitHub Release
+    needs: build
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: hotspot-switch-${{ needs.build.outputs.version }}-apk
+          path: release-assets
+
+      - name: Publish or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          NOTES_FILE="$(mktemp)"
+
+          cat > "$NOTES_FILE" <<EOF
+          ## Hotspot Switch ${VERSION}
+
+          Android home-screen widget for opening the device's native Mobile Hotspot settings and reflecting hotspot state.
+
+          ### Downloads
+          - **APK:** [hotspot-switch.apk](https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/hotspot-switch.apk)
+          - **Versioned APK:** hotspot-switch-${VERSION}.apk
+          - **SHA-256:** hotspot-switch.SHA256SUMS.txt
+
+          ### Install
+          Install the APK, add the Hotspot Switch widget to the home screen, tap it to open the phone's native hotspot settings, and change the Mobile Hotspot switch there. Return to the home screen to see the widget refresh.
+
+          ### Build
+          Built by the Android APK GitHub Actions workflow from commit ${GITHUB_SHA}.
+          EOF
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Updating existing release $TAG"
+            gh release upload "$TAG" \
+              release-assets/hotspot-switch.apk \
+              "release-assets/hotspot-switch-$VERSION.apk" \
+              release-assets/hotspot-switch.SHA256SUMS.txt \
+              --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" \
+              --title "Hotspot Switch $VERSION" \
+              --notes-file "$NOTES_FILE" \
+              --latest --repo "$GITHUB_REPOSITORY"
+          else
+            echo "Creating release $TAG"
+            gh release create "$TAG" \
+              release-assets/hotspot-switch.apk \
+              "release-assets/hotspot-switch-$VERSION.apk" \
+              release-assets/hotspot-switch.SHA256SUMS.txt \
+              --title "Hotspot Switch $VERSION" \
+              --notes-file "$NOTES_FILE" \
+              --latest --repo "$GITHUB_REPOSITORY"
+          fi
