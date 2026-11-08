@@ -6,24 +6,27 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.altmansoftwaredesign.hotspotwidget.R
+import com.altmansoftwaredesign.hotspotwidget.repository.Api36TetheringObserver
 import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.widget.HotspotWidgetProvider
 
 /**
- * Opens Samsung/Android hotspot controls. The activity listens for the Wi-Fi
- * AP state while Settings is in front and retains that authoritative event
- * when returning, preventing a stale interface query from overwriting it.
+ * Opens Samsung/Android hotspot controls. On Android 16 it keeps the public
+ * TetheringManager listener active while Settings is in front. Earlier Android
+ * versions retain the Wi-Fi AP broadcast listener as a best-effort fallback.
  */
 class HotspotSettingsActivity : Activity() {
 
     private var settingsOpened = false
     private var receiverRegistered = false
+    private var unregisterTetheringCallback: (() -> Unit)? = null
     @Volatile private var lastObservedApState: Boolean? = null
 
     private val wifiApReceiver = object : BroadcastReceiver() {
@@ -33,7 +36,6 @@ class HotspotSettingsActivity : Activity() {
                 .parseWifiApStateIntent(intent)
             if (state != null) {
                 lastObservedApState = state
-                Log.i(TAG, "Wi-Fi AP state event received: $state")
                 HotspotWidgetProvider.updateWidgets(
                     this@HotspotSettingsActivity,
                     hotspotStateOverride = state
@@ -44,7 +46,11 @@ class HotspotSettingsActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        registerWifiApReceiver()
+        if (Build.VERSION.SDK_INT >= 36) {
+            registerPublicTetheringCallback()
+        } else {
+            registerWifiApReceiver()
+        }
         if (savedInstanceState == null) openSystemHotspotSettings()
     }
 
@@ -52,8 +58,6 @@ class HotspotSettingsActivity : Activity() {
         super.onResume()
         if (settingsOpened) {
             refreshFromBestAvailableState()
-            // Samsung may finish the AP transition just after its Settings page
-            // closes. Prefer a state event observed while Settings was open.
             window.decorView.postDelayed({
                 if (!isFinishing && !isDestroyed) {
                     refreshFromBestAvailableState()
@@ -66,15 +70,30 @@ class HotspotSettingsActivity : Activity() {
     private fun refreshFromBestAvailableState() {
         val observed = lastObservedApState
         if (observed != null) {
-            Log.i(TAG, "Refreshing widget from observed Wi-Fi AP event: $observed")
             HotspotWidgetProvider.updateWidgets(this, hotspotStateOverride = observed)
         } else {
-            Log.i(TAG, "No Wi-Fi AP event observed; querying current device state")
             HotspotWidgetProvider.updateWidgets(this)
         }
     }
 
+    private fun registerPublicTetheringCallback() {
+        try {
+            unregisterTetheringCallback = Api36TetheringObserver.register(this) { state ->
+                lastObservedApState = state
+                Log.i(TAG, "API 36 public tethering callback: wifi=$state")
+                HotspotWidgetProvider.updateWidgets(
+                    this@HotspotSettingsActivity,
+                    hotspotStateOverride = state
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not register public API 36 tethering callback", e)
+        }
+    }
+
     override fun onDestroy() {
+        unregisterTetheringCallback?.invoke()
+        unregisterTetheringCallback = null
         if (receiverRegistered) {
             try {
                 unregisterReceiver(wifiApReceiver)

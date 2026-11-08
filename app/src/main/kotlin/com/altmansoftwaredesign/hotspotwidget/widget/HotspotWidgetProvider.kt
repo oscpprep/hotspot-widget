@@ -6,14 +6,20 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
+import androidx.annotation.RequiresApi
 import com.altmansoftwaredesign.hotspotwidget.R
+import com.altmansoftwaredesign.hotspotwidget.repository.Api36TetheringObserver
 import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.ui.HotspotSettingsActivity
+import java.util.concurrent.atomic.AtomicBoolean
 
-/** Minimal hotspot card with a custom, state-aware slider. */
+/** Minimal hotspot card with a state-aware slider. */
 class HotspotWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(
@@ -26,13 +32,9 @@ class HotspotWidgetProvider : AppWidgetProvider() {
 
     companion object {
         private const val TAG = "HotspotWidget"
+        private const val API36_CALLBACK_TIMEOUT_MS = 2500L
+        private val mainHandler = Handler(Looper.getMainLooper())
 
-        /**
-         * Refresh immediately and synchronously. The repository performs a
-         * quick WifiManager state query first. Do not spawn a raw thread here:
-         * when called from BroadcastReceiver.onReceive(), Android may reclaim
-         * the process as soon as onReceive returns and kill untracked work.
-         */
         fun updateWidgets(
             context: Context,
             manager: AppWidgetManager = AppWidgetManager.getInstance(context),
@@ -42,14 +44,65 @@ class HotspotWidgetProvider : AppWidgetProvider() {
             hotspotStateOverride: Boolean? = null
         ) {
             if (ids.isEmpty()) return
+            val appContext = context.applicationContext
+
+            if (Build.VERSION.SDK_INT >= 36 && hotspotStateOverride == null) {
+                updateFromApi36Callback(appContext, manager, ids)
+                return
+            }
+
+            val state = hotspotStateOverride ?: HotspotRepository(appContext).isHotspotEnabled()
+            applyStateToWidgets(appContext, manager, ids, state)
+        }
+
+        @RequiresApi(36)
+        private fun updateFromApi36Callback(
+            context: Context,
+            manager: AppWidgetManager,
+            ids: IntArray
+        ) {
+            val completed = AtomicBoolean(false)
+            var unregister: (() -> Unit)? = null
+            lateinit var timeout: Runnable
+
+            fun finishWithState(state: Boolean) {
+                if (!completed.compareAndSet(false, true)) return
+                mainHandler.removeCallbacks(timeout)
+                unregister?.invoke()
+                applyStateToWidgets(context, manager, ids, state)
+            }
+
+            timeout = Runnable {
+                if (completed.compareAndSet(false, true)) {
+                    unregister?.invoke()
+                    val fallback = HotspotRepository(context).isHotspotEnabled()
+                    applyStateToWidgets(context, manager, ids, fallback)
+                }
+            }
+
             try {
-                val appContext = context.applicationContext
-                val state = hotspotStateOverride
-                    ?: HotspotRepository(appContext).isHotspotEnabled()
-                ids.forEach { id -> updateWidget(appContext, manager, id, state) }
-                Log.d(TAG, "Updated ${ids.size} widget(s), hotspotState=$state")
+                unregister = Api36TetheringObserver.register(context, ::finishWithState)
+                mainHandler.postDelayed(timeout, API36_CALLBACK_TIMEOUT_MS)
             } catch (e: Exception) {
-                Log.w(TAG, "Unable to refresh hotspot widgets", e)
+                Log.w(TAG, "Public API 36 tethering callback failed; using fallback", e)
+                if (completed.compareAndSet(false, true)) {
+                    val fallback = HotspotRepository(context).isHotspotEnabled()
+                    applyStateToWidgets(context, manager, ids, fallback)
+                }
+            }
+        }
+
+        private fun applyStateToWidgets(
+            context: Context,
+            manager: AppWidgetManager,
+            ids: IntArray,
+            hotspotState: Boolean?
+        ) {
+            try {
+                ids.forEach { id -> updateWidget(context, manager, id, hotspotState) }
+                Log.d(TAG, "Updated ${ids.size} widget(s), hotspotState=$hotspotState")
+            } catch (e: Exception) {
+                Log.w(TAG, "Unable to apply widget state", e)
             }
         }
 

@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.altmansoftwaredesign.hotspotwidget"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.altmansoftwaredesign.hotspotwidget"
         minSdk = 31
         targetSdk = 34
-        versionCode = 12
-        versionName = "1.3.7"
+        versionCode = 13
+        versionName = "1.3.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

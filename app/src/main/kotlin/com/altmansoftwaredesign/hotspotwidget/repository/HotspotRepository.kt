@@ -8,24 +8,18 @@ import android.net.wifi.WifiManager
 import android.util.Log
 
 /**
- * Read-only hotspot state detection.
- *
- * Primary source: WifiManager#getWifiApState, which returns the current AP
- * state synchronously. This avoids relying on a possibly stale sticky broadcast.
- *
- * Fallbacks: the Wi-Fi AP state broadcast, tether-state broadcast, and active
- * tethered-interface list.
+ * Best-effort legacy hotspot-state detection for Android 12-15.
+ * Android 16 uses Api36TetheringObserver, backed by the public
+ * TetheringManager.TetheringEventCallback.
  */
 class HotspotRepository(context: Context) {
     private val appContext = context.applicationContext
     private val connectivityManager =
         appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val wifiManager =
-        appContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        appContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
     fun isHotspotEnabled(): Boolean? {
-        // Query the current state first. Sticky broadcasts can contain an old
-        // value on some OEM builds and must never override the live system state.
         readStateFromWifiManager()?.let { return it }
         readStateFromStickyWifiApBroadcast()?.let { return it }
         readStateFromStickyTetherBroadcast()?.let { return it }
@@ -112,7 +106,6 @@ class HotspotRepository(context: Context) {
     private fun stateToBoolean(state: Int): Boolean? = when (state) {
         WIFI_AP_STATE_ENABLED -> true
         WIFI_AP_STATE_DISABLED, WIFI_AP_STATE_DISABLING, WIFI_AP_STATE_FAILED -> false
-        // Do not momentarily flip the UI while the access point is transitioning.
         WIFI_AP_STATE_ENABLING, STATE_UNKNOWN -> null
         else -> null
     }

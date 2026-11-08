@@ -3,17 +3,23 @@ package com.altmansoftwaredesign.hotspotwidget.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.widget.HotspotWidgetProvider
 
 /**
- * Receives Android Wi-Fi AP state transitions and tethering changes.
- * The Wi-Fi AP state is the authoritative primary signal; tether interface
- * broadcasts remain as a fallback for device-specific implementations.
+ * Legacy broadcast receiver for Android 12-15. On Android 16 the widget asks
+ * the public TetheringManager callback for a fresh authoritative state instead
+ * of trusting this hidden/legacy broadcast payload.
  */
 class TetherStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (Build.VERSION.SDK_INT >= 36) {
+            HotspotWidgetProvider.updateWidgets(context)
+            return
+        }
+
         val repository = HotspotRepository(context)
         val state = when (intent.action) {
             ACTION_WIFI_AP_STATE_CHANGED -> repository.parseWifiApStateIntent(intent)
@@ -23,10 +29,7 @@ class TetherStateReceiver : BroadcastReceiver() {
 
         Log.d(TAG, "Received ${intent.action} state=$state")
         if (state != null) {
-            HotspotWidgetProvider.updateWidgets(
-                context,
-                hotspotStateOverride = state
-            )
+            HotspotWidgetProvider.updateWidgets(context, hotspotStateOverride = state)
         }
     }
 
