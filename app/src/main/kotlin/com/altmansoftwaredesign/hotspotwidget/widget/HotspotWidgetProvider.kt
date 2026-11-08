@@ -16,6 +16,7 @@ import androidx.annotation.RequiresApi
 import com.altmansoftwaredesign.hotspotwidget.R
 import com.altmansoftwaredesign.hotspotwidget.repository.Api36TetheringObserver
 import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
+import com.altmansoftwaredesign.hotspotwidget.service.HotspotMonitorService
 import com.altmansoftwaredesign.hotspotwidget.ui.HotspotSettingsActivity
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -27,13 +28,34 @@ class HotspotWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
+        startMonitorSafely(context, "widget update or restore")
         updateWidgets(context, appWidgetManager, appWidgetIds)
+    }
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        startMonitorSafely(context, "first widget added")
+    }
+
+    override fun onDisabled(context: Context) {
+        // Stop the persistent observer only after the final widget is removed.
+        HotspotMonitorService.stop(context)
+        super.onDisabled(context)
     }
 
     companion object {
         private const val TAG = "HotspotWidget"
         private const val API36_CALLBACK_TIMEOUT_MS = 2500L
         private val mainHandler = Handler(Looper.getMainLooper())
+
+        private fun startMonitorSafely(context: Context, reason: String) {
+            try {
+                HotspotMonitorService.start(context)
+                Log.i(TAG, "Started event-driven monitor: $reason")
+            } catch (e: Exception) {
+                Log.e(TAG, "Unable to start event-driven monitor: $reason", e)
+            }
+        }
 
         fun updateWidgets(
             context: Context,
