@@ -45,6 +45,7 @@ class HotspotMonitorService : Service() {
             }
             Log.i(TAG, "Legacy tether event ${intent.action}: state=$state")
             if (state != null) {
+                setCachedState(state)
                 HotspotWidgetProvider.updateWidgets(
                     this@HotspotMonitorService,
                     hotspotStateOverride = state
@@ -130,6 +131,7 @@ class HotspotMonitorService : Service() {
         if (Build.VERSION.SDK_INT >= 36) {
             try {
                 unregisterTetheringCallback = Api36TetheringObserver.register(this) { state ->
+                    setCachedState(state)
                     Log.i(TAG, "Public Android 16 tethering event: Wi-Fi active=$state")
                     // The callback remains registered; every ON and OFF event is
                     // applied immediately to all installed widget instances.
@@ -170,7 +172,13 @@ class HotspotMonitorService : Service() {
     }
 
     private fun refreshFromCurrentState() {
-        HotspotWidgetProvider.updateWidgets(this)
+        val state = HotspotRepository(this).isHotspotEnabled()
+        if (state != null) {
+            setCachedState(state)
+            HotspotWidgetProvider.updateWidgets(this, hotspotStateOverride = state)
+        } else {
+            HotspotWidgetProvider.updateWidgets(this, hotspotStateOverride = null)
+        }
     }
 
     override fun onDestroy() {
@@ -205,7 +213,17 @@ class HotspotMonitorService : Service() {
             ContextCompat.startForegroundService(context.applicationContext, intent)
         }
 
+        @Volatile
+        private var cachedHotspotState: Boolean? = null
+
+        fun currentState(): Boolean? = cachedHotspotState
+
+        private fun setCachedState(state: Boolean) {
+            cachedHotspotState = state
+        }
+
         fun stop(context: Context) {
+            cachedHotspotState = null
             context.stopService(Intent(context, HotspotMonitorService::class.java))
         }
     }
