@@ -6,16 +6,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.net.TetheringInterface
-import android.net.TetheringManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.altmansoftwaredesign.hotspotwidget.R
+import com.altmansoftwaredesign.hotspotwidget.repository.Api36TetheringObserver
 import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.widget.HotspotWidgetProvider
 
@@ -28,8 +26,7 @@ class HotspotSettingsActivity : Activity() {
 
     private var settingsOpened = false
     private var receiverRegistered = false
-    private var tetheringManager: TetheringManager? = null
-    private var tetheringCallback: TetheringManager.TetheringEventCallback? = null
+    private var unregisterTetheringCallback: (() -> Unit)? = null
     @Volatile private var lastObservedApState: Boolean? = null
 
     private val wifiApReceiver = object : BroadcastReceiver() {
@@ -79,41 +76,24 @@ class HotspotSettingsActivity : Activity() {
         }
     }
 
-    @RequiresApi(36)
     private fun registerPublicTetheringCallback() {
         try {
-            val manager = getSystemService(TetheringManager::class.java) ?: return
-            val callback = object : TetheringManager.TetheringEventCallback {
-                override fun onTetheredInterfacesChanged(interfaces: Set<TetheringInterface>) {
-                    val state = interfaces.any {
-                        it.type == TetheringManager.TETHERING_WIFI
-                    }
-                    lastObservedApState = state
-                    Log.i(TAG, "API 36 tethering interface callback: $interfaces, wifi=$state")
-                    HotspotWidgetProvider.updateWidgets(
-                        this@HotspotSettingsActivity,
-                        hotspotStateOverride = state
-                    )
-                }
+            unregisterTetheringCallback = Api36TetheringObserver.register(this) { state ->
+                lastObservedApState = state
+                Log.i(TAG, "API 36 public tethering callback: wifi=$state")
+                HotspotWidgetProvider.updateWidgets(
+                    this@HotspotSettingsActivity,
+                    hotspotStateOverride = state
+                )
             }
-            manager.registerTetheringEventCallback(mainExecutor, callback)
-            tetheringManager = manager
-            tetheringCallback = callback
         } catch (e: Exception) {
             Log.w(TAG, "Could not register public API 36 tethering callback", e)
         }
     }
 
     override fun onDestroy() {
-        tetheringManager?.let { manager ->
-            tetheringCallback?.let { callback ->
-                try {
-                    manager.unregisterTetheringEventCallback(callback)
-                } catch (e: Exception) {
-                    Log.d(TAG, "Tethering callback already unregistered", e)
-                }
-            }
-        }
+        unregisterTetheringCallback?.invoke()
+        unregisterTetheringCallback = null
         if (receiverRegistered) {
             try {
                 unregisterReceiver(wifiApReceiver)
