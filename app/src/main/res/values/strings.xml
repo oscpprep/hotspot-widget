@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Hotspot Switch</string>
-    <string name="hotspot_on">HOTSPOT ON</string>
-    <string name="hotspot_off">HOTSPOT OFF</string>
-    <string name="hotspot_accessibility_on">Hotspot is on. Tap to open system hotspot controls.</string>
-    <string name="hotspot_accessibility_off">Hotspot is off. Tap to open system hotspot controls.</string>
-    <string name="hotspot_accessibility_unknown">Hotspot state unavailable. Tap to open system hotspot controls.</string>
-    <string name="hotspot_widget_description">One large switch that opens your phone\'s built-in Mobile Hotspot controls.</string>
+    <string name="hotspot_on">ON</string>
+    <string name="hotspot_off">OFF</string>
+    <string name="hotspot_widget_label">MOBILE HOTSPOT</string>
+    <string name="hotspot_state_unknown">—</string>
+    <string name="hotspot_accessibility_on">Mobile hotspot is on. Tap to open system hotspot controls.</string>
+    <string name="hotspot_accessibility_off">Mobile hotspot is off. Tap to open system hotspot controls.</string>
+    <string name="hotspot_accessibility_unknown">Mobile hotspot state is unavailable. Tap to open system hotspot controls.</string>
+    <string name="hotspot_widget_description">A large mobile hotspot switch shortcut.</string>
     <string name="open_settings_manually">Open Settings → Connections → Mobile Hotspot and Tethering → Mobile Hotspot.</string>
     <string name="setup_title">One switch. System controls.</string>
     <string name="setup_body">Add the Hotspot Switch to your home screen. Tap the large switch to open Android or Samsung\'s own Mobile Hotspot screen, then use the switch there to turn your hotspot on or off. Return to your home screen and this widget will refresh its state.</string>
