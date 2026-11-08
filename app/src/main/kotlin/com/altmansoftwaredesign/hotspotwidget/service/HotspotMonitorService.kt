@@ -131,7 +131,7 @@ class HotspotMonitorService : Service() {
         if (Build.VERSION.SDK_INT >= 36) {
             try {
                 unregisterTetheringCallback = Api36TetheringObserver.register(this) { state ->
-                    setCachedState(state)
+                    HotspotMonitorService.recordState(state)
                     Log.i(TAG, "Public Android 16 tethering event: Wi-Fi active=$state")
                     // The callback remains registered; every ON and OFF event is
                     // applied immediately to all installed widget instances.
@@ -174,7 +174,7 @@ class HotspotMonitorService : Service() {
     private fun refreshFromCurrentState() {
         val state = HotspotRepository(this).isHotspotEnabled()
         if (state != null) {
-            setCachedState(state)
+            HotspotMonitorService.recordState(state)
             HotspotWidgetProvider.updateWidgets(this, hotspotStateOverride = state)
         } else {
             HotspotWidgetProvider.updateWidgets(this, hotspotStateOverride = null)
