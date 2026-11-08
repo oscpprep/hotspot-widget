@@ -11,10 +11,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import androidx.annotation.RequiresApi
 import android.widget.RemoteViews
 import androidx.annotation.RequiresApi
 import com.altmansoftwaredesign.hotspotwidget.R
@@ -36,8 +32,6 @@ class HotspotWidgetProvider : AppWidgetProvider() {
 
     companion object {
         private const val TAG = "HotspotWidget"
-        private const val API36_CALLBACK_TIMEOUT_MS = 2500L
-        private val mainHandler = Handler(Looper.getMainLooper())
         private const val API36_CALLBACK_TIMEOUT_MS = 2500L
         private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -69,65 +63,6 @@ class HotspotWidgetProvider : AppWidgetProvider() {
         ) {
             val completed = AtomicBoolean(false)
             var unregister: (() -> Unit)? = null
-
-            fun finishWithState(state: Boolean) {
-                if (!completed.compareAndSet(false, true)) return
-                mainHandler.removeCallbacksAndMessages(ids.contentHashCode())
-                unregister?.invoke()
-                applyStateToWidgets(context, manager, ids, state)
-            }
-
-            try {
-                unregister = HotspotRepository(context).registerPublicTetheringCallback { state ->
-                    finishWithState(state)
-                }
-
-                // If the OEM implementation does not send the initial callback,
-                // fall back to the older read methods instead of leaving stale UI.
-                mainHandler.postAtTime(
-                    {
-                        if (completed.compareAndSet(false, true)) {
-                            unregister?.invoke()
-                            val fallback = HotspotRepository(context).isHotspotEnabled()
-                            applyStateToWidgets(context, manager, ids, fallback)
-                        }
-                    },
-                    ids.contentHashCode(),
-                    android.os.SystemClock.uptimeMillis() + API36_CALLBACK_TIMEOUT_MS
-                )
-            } catch (e: Exception) {
-                Log.w(TAG, "API 36 tethering callback unavailable; using fallback", e)
-                if (completed.compareAndSet(false, true)) {
-                    val fallback = HotspotRepository(context).isHotspotEnabled()
-                    applyStateToWidgets(context, manager, ids, fallback)
-                }
-            }
-        }
-
-        private fun applyStateToWidgets(
-            context: Context,
-            manager: AppWidgetManager,
-            ids: IntArray,
-            hotspotState: Boolean?
-        ) {
-            try {
-                ids.forEach { id -> updateWidget(context, manager, id, hotspotState) }
-                Log.d(TAG, "Updated ${ids.size} widget(s), hotspotState=$hotspotState")
-            } catch (e: Exception) {
-                Log.w(TAG, "Unable to refresh hotspot widgets", e)
-            }
-        }
-
-
-        @RequiresApi(36)
-        private fun updateFromApi36Callback(
-            context: Context,
-            manager: AppWidgetManager,
-            ids: IntArray
-        ) {
-            val completed = AtomicBoolean(false)
-            var unregister: (() -> Unit)? = null
-
             lateinit var timeout: Runnable
 
             fun finishWithState(state: Boolean) {
