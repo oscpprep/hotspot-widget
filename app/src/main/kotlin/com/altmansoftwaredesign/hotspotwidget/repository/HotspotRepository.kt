@@ -10,13 +10,11 @@ import android.util.Log
 /**
  * Read-only hotspot state detection.
  *
- * Primary source: Wi-Fi's dedicated WIFI_AP_STATE_CHANGED broadcast. It
- * describes the Soft AP state directly (disabled/enabling/enabled/etc), rather
- * than inferring it from interface names. The same broadcast is used by
- * Android's System UI hotspot controller.
+ * Primary source: WifiManager#getWifiApState, which returns the current AP
+ * state synchronously. This avoids relying on a possibly stale sticky broadcast.
  *
- * Fallbacks: reflective WifiManager#getWifiApState, then tether-state interface
- * lists for OEM builds which do not expose the Wi-Fi AP broadcast.
+ * Fallbacks: the Wi-Fi AP state broadcast, tether-state broadcast, and active
+ * tethered-interface list.
  */
 class HotspotRepository(context: Context) {
     private val appContext = context.applicationContext
@@ -26,8 +24,10 @@ class HotspotRepository(context: Context) {
         appContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
     fun isHotspotEnabled(): Boolean? {
-        readStateFromStickyWifiApBroadcast()?.let { return it }
+        // Query the current state first. Sticky broadcasts can contain an old
+        // value on some OEM builds and must never override the live system state.
         readStateFromWifiManager()?.let { return it }
+        readStateFromStickyWifiApBroadcast()?.let { return it }
         readStateFromStickyTetherBroadcast()?.let { return it }
         return readStateFromLegacyFallback()
     }
