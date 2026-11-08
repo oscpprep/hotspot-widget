@@ -7,9 +7,7 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.Settings
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import com.altmansoftwaredesign.hotspotwidget.R
 import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.service.BatteryMonitorService
 import kotlinx.coroutines.CoroutineScope
@@ -27,11 +25,10 @@ class ConfirmToggleActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // A widget tap is an allowed context to start a foreground service, so
-        // ensure the live battery/hotspot monitor is running from here.
+        // A widget tap is a user-initiated foreground action. Keep this Activity
+        // alive while requesting tethering so the user sees Android's actual result.
         BatteryMonitorService.start(this)
 
-        // Determine current state to phrase the dialog correctly.
         scope.launch {
             val isEnabled = withContext(Dispatchers.IO) {
                 HotspotRepository(applicationContext).getHotspotState().isEnabled
@@ -41,70 +38,97 @@ class ConfirmToggleActivity : Activity() {
     }
 
     override fun onDestroy() {
-        // Cancel first so a slow state read can't call showDialog on a dead
-        // window, then drop the dialog so it isn't leaked on rotation.
         scope.cancel()
         dialog?.dismiss()
         dialog = null
         super.onDestroy()
     }
 
-    /**
-     * We couldn't read the hotspot state, so we can't say whether "confirm" would
-     * turn it on or off. Offering the toggle anyway risks doing the opposite of
-     * what the user intends, so the honest move is to say so and do nothing.
-     */
     private fun showUnavailableDialog() {
         dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.state_unavailable_title)
-            .setMessage(R.string.state_unavailable_message)
+            .setTitle("Hotspot state unavailable")
+            .setMessage(
+                "This device isn't reporting its hotspot state, so the widget won't guess. Use Quick Settings to change the hotspot."
+            )
             .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
             .setOnCancelListener { finish() }
             .show()
     }
 
     private fun showDialog(isCurrentlyEnabled: Boolean) {
-        val messageRes = if (isCurrentlyEnabled) {
-            R.string.confirm_turn_off
+        val message = if (isCurrentlyEnabled) {
+            "Turn the hotspot off?"
         } else {
-            R.string.confirm_turn_on
+            "Turn the hotspot on?"
         }
-        val confirmLabel = if (isCurrentlyEnabled) {
-            getString(R.string.turn_off)
-        } else {
-            getString(R.string.turn_on)
-        }
+        val confirmLabel = if (isCurrentlyEnabled) "Turn Off" else "Turn On"
 
         dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.toggle_hotspot)
-            .setMessage(messageRes)
+            .setTitle("Toggle Hotspot")
+            .setMessage(message)
             .setPositiveButton(confirmLabel) { _, _ ->
                 if (!Settings.System.canWrite(this)) {
-                    // Toggling tethering needs WRITE_SETTINGS; send the user to grant
-                    // it once, then they tap the widget again to actually toggle.
-                    Toast.makeText(
-                        this,
-                        R.string.grant_write_settings,
-                        Toast.LENGTH_LONG
-                    ).show()
-                    startActivity(
-                        Intent(
-                            Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                            Uri.parse("package:$packageName")
+                    dialog?.dismiss()
+                    dialog = AlertDialog.Builder(this)
+                        .setTitle("Permission required")
+                        .setMessage(
+                            "Allow “Modify system settings” for Hotspot Widget, return to the home screen, and tap the widget again."
                         )
-                    )
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                                    Uri.parse("package:$packageName")
+                                )
+                            )
+                            finish()
+                        }
+                        .setOnCancelListener { finish() }
+                        .show()
                 } else {
                     vibrate()
-                    // Send the state the user just agreed to, not "flip whatever
-                    // is current" — those can differ if the hotspot changed while
-                    // the dialog was up.
-                    BatteryMonitorService.setHotspot(this, enable = !isCurrentlyEnabled)
+                    performToggle(enable = !isCurrentlyEnabled)
                 }
-                finish()
             }
-            .setNegativeButton(R.string.cancel) { _, _ -> finish() }
+            .setNegativeButton("Cancel") { _, _ -> finish() }
             .setOnCancelListener { finish() }
             .show()
+    }
+
+    private fun performToggle(enable: Boolean) {
+        dialog?.dismiss()
+        dialog = AlertDialog.Builder(this)
+            .setTitle(if (enable) "Turning hotspot on" else "Turning hotspot off")
+            .setMessage("Waiting for Android to respond…")
+            .setCancelable(false)
+            .create()
+            .also { it.show() }
+
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                val repository = HotspotRepository(applicationContext)
+                if (enable) repository.enableHotspot() else repository.disableHotspot()
+            }
+
+            dialog?.dismiss()
+
+            // Re-read widget/notification state after the tethering operation.
+            BatteryMonitorService.start(this@ConfirmToggleActivity)
+
+            dialog = AlertDialog.Builder(this@ConfirmToggleActivity)
+                .setTitle(
+                    when {
+                        result.succeeded && enable -> "Hotspot is on"
+                        result.succeeded -> "Hotspot is off"
+                        enable -> "Hotspot could not be turned on"
+                        else -> "Hotspot could not be turned off"
+                    }
+                )
+                .setMessage(result.message)
+                .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
+                .setOnCancelListener { finish() }
+                .show()
+        }
     }
 
     private fun vibrate() {
