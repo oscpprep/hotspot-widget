@@ -28,9 +28,10 @@ class HotspotWidgetProvider : AppWidgetProvider() {
         private const val TAG = "HotspotWidget"
 
         /**
-         * Read hotspot state off the launcher thread. A non-null override comes
-         * from the protected tether-state system broadcast and is more reliable
-         * than OEM-dependent interface reflection.
+         * Refresh immediately and synchronously. The repository performs a
+         * quick WifiManager state query first. Do not spawn a raw thread here:
+         * when called from BroadcastReceiver.onReceive(), Android may reclaim
+         * the process as soon as onReceive returns and kill untracked work.
          */
         fun updateWidgets(
             context: Context,
@@ -41,15 +42,15 @@ class HotspotWidgetProvider : AppWidgetProvider() {
             hotspotStateOverride: Boolean? = null
         ) {
             if (ids.isEmpty()) return
-            Thread({
-                try {
-                    val state = hotspotStateOverride
-                        ?: HotspotRepository(context.applicationContext).isHotspotEnabled()
-                    ids.forEach { id -> updateWidget(context.applicationContext, manager, id, state) }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Unable to refresh hotspot widgets", e)
-                }
-            }, "HotspotWidgetRefresh").start()
+            try {
+                val appContext = context.applicationContext
+                val state = hotspotStateOverride
+                    ?: HotspotRepository(appContext).isHotspotEnabled()
+                ids.forEach { id -> updateWidget(appContext, manager, id, state) }
+                Log.d(TAG, "Updated ${ids.size} widget(s), hotspotState=$state")
+            } catch (e: Exception) {
+                Log.w(TAG, "Unable to refresh hotspot widgets", e)
+            }
         }
 
         private fun updateWidget(
