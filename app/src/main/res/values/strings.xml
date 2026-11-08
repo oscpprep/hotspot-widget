@@ -14,7 +14,7 @@
     <string name="setup_body">Add the Hotspot Switch to your home screen. Tap the large switch to open Android or Samsung\'s own Mobile Hotspot screen, then use the switch there to turn your hotspot on or off. Return to your home screen and this widget will refresh its state.</string>
     <string name="setup_version">Hotspot Switch %1$s</string>
     <string name="monitor_notification_channel">Hotspot state monitoring</string>
-    <string name="monitor_notification_channel_description">Keeps the home-screen hotspot widget synchronized with Android's tethering state.</string>
+    <string name="monitor_notification_channel_description">Keeps the home-screen hotspot widget synchronized with Android\'s tethering state.</string>
     <string name="monitor_notification_title">Hotspot Switch is monitoring</string>
-    <string name="monitor_notification_text">Keeping the widget's ON/OFF state in sync. Updates are event-driven, not periodic polling.</string>
+    <string name="monitor_notification_text">Keeping the widget\'s ON/OFF state in sync. Updates are event-driven, not periodic polling.</string>
 </resources>
