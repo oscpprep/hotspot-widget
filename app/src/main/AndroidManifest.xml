@@ -27,6 +27,14 @@
             android:theme="@style/Theme.HotspotWidget.Transparent" />
 
         <receiver
+            android:name=".receiver.TetherStateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.net.conn.TETHER_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".widget.HotspotWidgetProvider"
             android:exported="true"
             android:permission="android.permission.BIND_APPWIDGET">
