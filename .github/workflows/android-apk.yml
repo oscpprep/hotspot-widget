@@ -42,16 +42,30 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Build debug APK
-        run: ./gradlew --no-daemon --stacktrace clean assembleDebug
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace clean assembleDebug 2>&1 | tee build.log
 
       - name: Verify APK and create checksum
+        if: success()
         shell: bash
         run: |
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           sha256sum "$APK" | tee app/build/outputs/apk/debug/SHA256SUMS.txt
 
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hotspot-widget-build-log
+          path: build.log
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v7
         with:
           name: hotspot-widget-debug-apk
