@@ -3,21 +3,19 @@ package com.altmansoftwaredesign.hotspotwidget.widget
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.view.View
 import android.widget.RemoteViews
 import com.altmansoftwaredesign.hotspotwidget.R
-import com.altmansoftwaredesign.hotspotwidget.repository.BatteryRepository
 import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
-import com.altmansoftwaredesign.hotspotwidget.service.BatteryMonitorService
-import com.altmansoftwaredesign.hotspotwidget.ui.AboutActivity
-import com.altmansoftwaredesign.hotspotwidget.ui.ConfirmToggleActivity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.altmansoftwaredesign.hotspotwidget.ui.HotspotSettingsActivity
 
+/**
+ * A single large switch. The switch is a shortcut into Android/Samsung's own
+ * hotspot Settings UI; the app never attempts to change tethering behind the
+ * system UI's back.
+ */
 class HotspotWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(
@@ -25,109 +23,58 @@ class HotspotWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        // Just draw the widgets. The live monitor is started from a user tap
-        // (ConfirmToggleActivity) or BootReceiver — never from here, because
-        // Android 12+ forbids starting a foreground service from a receiver.
-        //
-        // goAsync() keeps the process alive until the draw finishes. Without it
-        // onReceive returns immediately and the work races process death, leaving
-        // the widget showing the static initialLayout instead of real values.
-        val pendingResult = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                for (appWidgetId in appWidgetIds) {
-                    updateAppWidget(context, appWidgetManager, appWidgetId)
-                }
-            } finally {
-                pendingResult.finish()
-            }
-        }
-    }
-
-    override fun onDisabled(context: Context) {
-        // Last widget removed: tear the monitor (and its notification) down.
-        BatteryMonitorService.stop(context)
+        updateWidgets(context, appWidgetManager, appWidgetIds)
     }
 
     companion object {
-        /**
-         * Draws one widget. Suspends until the draw is done so callers can keep
-         * the process alive for its duration — a fire-and-forget launch here would
-         * silently lose the update whenever the process is reclaimed first.
-         */
-        suspend fun updateAppWidget(
+        fun updateWidgets(
             context: Context,
-            appWidgetManager: AppWidgetManager,
+            manager: AppWidgetManager = AppWidgetManager.getInstance(context),
+            ids: IntArray = manager.getAppWidgetIds(
+                ComponentName(context, HotspotWidgetProvider::class.java)
+            )
+        ) {
+            ids.forEach { id -> updateWidget(context, manager, id) }
+        }
+
+        private fun updateWidget(
+            context: Context,
+            manager: AppWidgetManager,
             appWidgetId: Int
         ) {
-            withContext(Dispatchers.IO) {
-                val hotspotRepo = HotspotRepository(context)
-                val batteryRepo = BatteryRepository(context)
+            val hotspotState = HotspotRepository(context).isHotspotEnabled()
+            val views = RemoteViews(context.packageName, R.layout.widget_layout)
 
-                val hotspotState = hotspotRepo.getHotspotState()
-                val batteryState = batteryRepo.getBatteryState()
-
-                val views = RemoteViews(context.packageName, R.layout.widget_layout)
-
-                // Update hotspot status. A null reading means we genuinely don't
-                // know, so show that rather than defaulting to "off".
-                val hotspotIconRes = when (hotspotState.isEnabled) {
-                    true -> R.drawable.ic_hotspot_on
-                    false -> R.drawable.ic_hotspot_off
-                    null -> R.drawable.ic_hotspot_unknown
+            // Switch widgets are stateful RemoteViews on Android 12+.
+            // Unknown is shown as off visually, but its description says unknown.
+            views.setCompoundButtonChecked(R.id.hotspot_switch, hotspotState == true)
+            views.setContentDescription(
+                R.id.hotspot_switch,
+                when (hotspotState) {
+                    true -> context.getString(R.string.hotspot_accessibility_on)
+                    false -> context.getString(R.string.hotspot_accessibility_off)
+                    null -> context.getString(R.string.hotspot_accessibility_unknown)
                 }
-                val hotspotStatusText = when (hotspotState.isEnabled) {
-                    true -> R.string.hotspot_on
-                    false -> R.string.hotspot_off
-                    null -> R.string.hotspot_unknown
-                }
-                views.setImageViewResource(R.id.hotspot_icon, hotspotIconRes)
-                views.setTextViewText(R.id.hotspot_status, context.getString(hotspotStatusText))
+            )
 
-                // Update battery status
-                val batteryIconRes = when {
-                    batteryState.percentage > 60 -> R.drawable.ic_battery_high
-                    batteryState.percentage > 20 -> R.drawable.ic_battery_medium
-                    else -> R.drawable.ic_battery_low
-                }
-                views.setImageViewResource(R.id.battery_icon, batteryIconRes)
-                views.setViewVisibility(
-                    R.id.battery_charging_bolt,
-                    if (batteryState.isCharging) View.VISIBLE else View.GONE
-                )
-                views.setTextViewText(
-                    R.id.battery_percentage,
-                    "${batteryState.percentage}%"
-                )
-
-                // Tapping the widget opens the confirmation dialog before toggling.
-                val confirmIntent = Intent(context, ConfirmToggleActivity::class.java).apply {
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                }
-                val confirmPendingIntent = PendingIntent.getActivity(
-                    context,
-                    appWidgetId,
-                    confirmIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_root, confirmPendingIntent)
-
-                // Tapping the battery side instead shows the About dialog. A child
-                // click overrides the root's for that region.
-                val aboutIntent = Intent(context, AboutActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                }
-                val aboutPendingIntent = PendingIntent.getActivity(
-                    context,
-                    appWidgetId,
-                    aboutIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.battery_section, aboutPendingIntent)
-
-                appWidgetManager.updateAppWidget(appWidgetId, views)
+            // The mutable PendingIntent allows RemoteViews to add EXTRA_CHECKED.
+            // HotspotSettingsActivity deliberately does not use that value to
+            // flip tethering; it opens the system-owned control instead.
+            val intent = Intent(context, HotspotSettingsActivity::class.java).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             }
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                appWidgetId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+            views.setOnCheckedChangeResponse(
+                R.id.hotspot_switch,
+                RemoteViews.RemoteResponse.fromPendingIntent(pendingIntent)
+            )
+
+            manager.updateAppWidget(appWidgetId, views)
         }
     }
 }
