@@ -43,10 +43,11 @@
         android:layout_height="48dp"
         android:layout_marginStart="14dp">
 
-        <View
+        <ImageView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@drawable/switch_track_off" />
+            android:background="@drawable/switch_track_off"
+            android:scaleType="fitXY" />
 
         <FrameLayout
             android:layout_width="36dp"
