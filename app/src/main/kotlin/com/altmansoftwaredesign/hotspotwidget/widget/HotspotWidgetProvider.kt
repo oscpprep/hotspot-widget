@@ -6,6 +6,8 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.util.Log
+import android.view.View
 import android.widget.RemoteViews
 import com.altmansoftwaredesign.hotspotwidget.R
 import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
@@ -23,6 +25,13 @@ class HotspotWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
+        private const val TAG = "HotspotWidget"
+
+        /**
+         * Querying tethering state may require waiting for Android's callback,
+         * so do the refresh off the launcher/UI thread. This method is also used
+         * when returning from Settings.
+         */
         fun updateWidgets(
             context: Context,
             manager: AppWidgetManager = AppWidgetManager.getInstance(context),
@@ -30,7 +39,14 @@ class HotspotWidgetProvider : AppWidgetProvider() {
                 ComponentName(context, HotspotWidgetProvider::class.java)
             )
         ) {
-            ids.forEach { id -> updateWidget(context, manager, id) }
+            if (ids.isEmpty()) return
+            Thread({
+                try {
+                    ids.forEach { id -> updateWidget(context.applicationContext, manager, id) }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Unable to refresh hotspot widgets", e)
+                }
+            }, "HotspotWidgetRefresh").start()
         }
 
         private fun updateWidget(
@@ -45,10 +61,10 @@ class HotspotWidgetProvider : AppWidgetProvider() {
                 true -> {
                     views.setTextViewText(R.id.hotspot_state, context.getString(R.string.hotspot_on))
                     views.setTextColor(R.id.hotspot_state, context.getColor(R.color.widget_state_on))
-                    views.setViewVisibility(R.id.switch_track_on, android.view.View.VISIBLE)
-                    views.setViewVisibility(R.id.switch_track_off, android.view.View.GONE)
-                    views.setViewVisibility(R.id.switch_thumb_on, android.view.View.VISIBLE)
-                    views.setViewVisibility(R.id.switch_thumb_off, android.view.View.GONE)
+                    views.setViewVisibility(R.id.switch_track_on, View.VISIBLE)
+                    views.setViewVisibility(R.id.switch_track_off, View.GONE)
+                    views.setViewVisibility(R.id.switch_thumb_on, View.VISIBLE)
+                    views.setViewVisibility(R.id.switch_thumb_off, View.GONE)
                     views.setContentDescription(
                         R.id.widget_root,
                         context.getString(R.string.hotspot_accessibility_on)
@@ -57,10 +73,10 @@ class HotspotWidgetProvider : AppWidgetProvider() {
                 false -> {
                     views.setTextViewText(R.id.hotspot_state, context.getString(R.string.hotspot_off))
                     views.setTextColor(R.id.hotspot_state, context.getColor(R.color.widget_state_off))
-                    views.setViewVisibility(R.id.switch_track_on, android.view.View.GONE)
-                    views.setViewVisibility(R.id.switch_track_off, android.view.View.VISIBLE)
-                    views.setViewVisibility(R.id.switch_thumb_on, android.view.View.GONE)
-                    views.setViewVisibility(R.id.switch_thumb_off, android.view.View.VISIBLE)
+                    views.setViewVisibility(R.id.switch_track_on, View.GONE)
+                    views.setViewVisibility(R.id.switch_track_off, View.VISIBLE)
+                    views.setViewVisibility(R.id.switch_thumb_on, View.GONE)
+                    views.setViewVisibility(R.id.switch_thumb_off, View.VISIBLE)
                     views.setContentDescription(
                         R.id.widget_root,
                         context.getString(R.string.hotspot_accessibility_off)
@@ -69,10 +85,10 @@ class HotspotWidgetProvider : AppWidgetProvider() {
                 null -> {
                     views.setTextViewText(R.id.hotspot_state, context.getString(R.string.hotspot_state_unknown))
                     views.setTextColor(R.id.hotspot_state, context.getColor(R.color.widget_state_unknown))
-                    views.setViewVisibility(R.id.switch_track_on, android.view.View.GONE)
-                    views.setViewVisibility(R.id.switch_track_off, android.view.View.VISIBLE)
-                    views.setViewVisibility(R.id.switch_thumb_on, android.view.View.GONE)
-                    views.setViewVisibility(R.id.switch_thumb_off, android.view.View.VISIBLE)
+                    views.setViewVisibility(R.id.switch_track_on, View.GONE)
+                    views.setViewVisibility(R.id.switch_track_off, View.VISIBLE)
+                    views.setViewVisibility(R.id.switch_thumb_on, View.GONE)
+                    views.setViewVisibility(R.id.switch_thumb_off, View.VISIBLE)
                     views.setContentDescription(
                         R.id.widget_root,
                         context.getString(R.string.hotspot_accessibility_unknown)
@@ -80,9 +96,8 @@ class HotspotWidgetProvider : AppWidgetProvider() {
                 }
             }
 
-            // The whole card is one large hit target. It opens the system-owned
-            // hotspot page; it does not pretend this third-party widget can toggle
-            // Samsung's privileged switch itself.
+            // The whole card is one large hit target. The Activity opens the
+            // system-owned hotspot page; it does not toggle tethering directly.
             val intent = Intent(context, HotspotSettingsActivity::class.java).apply {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             }
