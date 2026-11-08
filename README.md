@@ -1,6 +1,6 @@
 # Hotspot Switch
 
-A minimal Android home-screen widget that opens the phone's native Mobile Hotspot settings and reflects the hotspot's ON/OFF state.
+A minimal Android home-screen widget that opens the phone's native Mobile Hotspot settings and keeps its ON/OFF display synchronized with Android's tethering state.
 
 [![Android APK build](https://github.com/oscpprep/hotspot-widget/actions/workflows/android-apk.yml/badge.svg?branch=main)](https://github.com/oscpprep/hotspot-widget/actions/workflows/android-apk.yml)
 [![Latest release](https://img.shields.io/github/v/release/oscpprep/hotspot-widget?label=latest%20APK)](https://github.com/oscpprep/hotspot-widget/releases/latest)
@@ -11,30 +11,32 @@ A minimal Android home-screen widget that opens the phone's native Mobile Hotspo
 
 Also available: [all releases and version history](https://github.com/oscpprep/hotspot-widget/releases).
 
-The APK is attached to a GitHub Release, so the download link above remains stable as new versions are published. The checksum file is included with each release.
+The APK is attached to a GitHub Release, so the download link above remains stable as new versions are published. A SHA-256 checksum is included with each release.
 
 ## Quick start
 
 1. Download and install the APK.
 2. Long-press an empty area of the Android home screen.
 3. Open **Widgets**, find **Hotspot Switch**, and add it to the home screen.
-4. Tap the widget. It opens the phone's native Mobile Hotspot settings.
-5. Turn Mobile Hotspot ON or OFF using the system switch.
-6. Return to the home screen. The widget updates its label and slider to reflect the state reported by Android.
+4. The app starts its event-driven hotspot monitor when the widget is added.
+5. Tap the widget to open the phone's native Mobile Hotspot settings.
+6. Turn Mobile Hotspot ON or OFF using the system switch.
+7. Return to the home screen. The widget updates its label and slider as Android reports tethering changes.
 
 On Samsung Galaxy phones, the native settings page is under **Settings → Connections → Mobile Hotspot and Tethering → Mobile Hotspot**.
 
-> **Important:** The widget does not try to bypass Android/Samsung's privileged tethering controls. The operating system's own Settings screen performs the ON/OFF change. The widget observes and displays the resulting state.
+> **Important:** The widget does not bypass Android/Samsung's privileged tethering controls. The operating system's own Settings screen performs the ON/OFF change. Hotspot Switch observes the resulting state and reflects it in the widget.
 
 ## Features
 
 - One large, state-aware home-screen switch.
 - Custom dark rounded-card design with a large ON/OFF label and slider.
 - Opens the device's own hotspot settings instead of trying to force tethering through unsupported hidden APIs.
-- On Android 16, observes the public `TetheringManager.TetheringEventCallback` interface-state events while the system Settings page is open.
-- Keeps the tethering listener alive during the Settings visit and refreshes the widget when the user returns.
-- Retains older Android state-detection fallbacks.
-- No root, accessibility service, persistent foreground service, or battery/status panel.
+- Persistent, event-driven monitoring on Android 16 using the public `TetheringManager.TetheringEventCallback`.
+- Receives subsequent ON and OFF interface-state events while the widget exists, including changes made outside the helper Activity.
+- A low-priority, silent, ongoing notification indicates that the monitor is active.
+- No periodic polling, network traffic, root access, or accessibility-service automation.
+- The monitor stops when the last widget instance is removed.
 
 ## Compatibility
 
@@ -43,22 +45,24 @@ On Samsung Galaxy phones, the native settings page is under **Settings → Conne
 | Minimum Android version | Android 12 (API 31) |
 | Android SDK used to compile | Android 16 (API 36) |
 | Target SDK | API 34 |
-| Verified device | Samsung Galaxy S24 running Android 16 |
-| Latest confirmed working app version | 1.3.9 |
+| Device-confirmed baseline | Samsung Galaxy S24 running Android 16, app version 1.3.9 |
+| Persistent monitor implementation | 1.4.0 |
 
-**Device-specific note:** The Android 16 public tethering callback is used on API 36 devices. Earlier Android versions use legacy Wi-Fi AP/tethering state fallbacks. OEM behavior can differ; the Samsung Galaxy S24 / Android 16 combination has been tested with version 1.3.9.
+The Android 16 public tethering callback is used on API 36 devices. Earlier Android versions use legacy Wi-Fi AP/tethering state broadcasts as a best-effort fallback. OEM behavior can differ.
 
 ## How state updates work
 
 ### Android 16 (API 36)
 
-The app registers Android's public `TetheringManager.TetheringEventCallback`. The callback reports the current tethered-interface set and subsequent changes. The widget checks for an interface whose type is `TETHERING_WIFI` and updates its ON/OFF artwork.
+The app registers Android's public `TetheringManager.TetheringEventCallback` from a dedicated foreground service. The callback reports the current tethered-interface set immediately after registration and reports subsequent changes. The widget checks for an interface whose type is `TETHERING_WIFI` and updates its ON/OFF artwork.
 
-The temporary helper Activity remains alive while the system hotspot Settings screen is in front. It keeps the callback registered during that visit, applies state changes to the widget as callbacks arrive, and refreshes again after the user returns.
+The service starts when a widget is added or refreshed. It stays registered independently of the temporary Settings helper Activity, so it can continue to receive ON/OFF transitions after the user returns to the home screen or changes hotspot state from Quick Settings. It uses callbacks rather than a polling loop.
+
+Android requires a foreground service to keep this event listener reliably active in the background. Hotspot Switch therefore displays a quiet, low-priority notification while monitoring. The service stops when the last widget instance is removed.
 
 ### Android 12–15
 
-Older Android versions use best-effort fallback state detection through the Wi-Fi AP state broadcast, reflective `WifiManager.getWifiApState()`, and the tethered-interface query. These older paths are OEM-dependent and may not behave identically on every device.
+Older Android versions use dynamic receivers for Wi-Fi AP and tether-state broadcasts, plus best-effort state reads through legacy Wi-Fi/tethering interfaces. These OEM-dependent paths may not behave identically on every device.
 
 ## Build the APK yourself
 
@@ -70,8 +74,6 @@ Older Android versions use best-effort fallback state detection through the Wi-F
 - The Gradle wrapper included in this repository
 
 ### Command line
-
-Clone the repository and build:
 
 ```bash
 git clone https://github.com/oscpprep/hotspot-widget.git
@@ -110,7 +112,7 @@ Manual dispatch on the original repository requires write access. Anyone can dow
 
 For each successful build, the workflow:
 
-- Compiles the debug APK with JDK 17 and Android SDK 36.
+- Compiles the APK with JDK 17 and Android SDK 36.
 - Verifies that the APK exists and is not empty.
 - Creates a SHA-256 checksum.
 - Uploads a downloadable Actions artifact named `hotspot-switch-VERSION-apk` (kept for 30 days).
@@ -134,14 +136,17 @@ See [the workflow and release guide](docs/BUILDING.md#github-actions-and-release
 - [Build, Actions, and releases](docs/BUILDING.md)
 - [Troubleshooting and compatibility](docs/TROUBLESHOOTING.md)
 
-## Permissions and privacy
+## Permissions, notification, and privacy
 
-The app declares only these normal Android permissions:
+The app declares these permissions:
 
 - `ACCESS_NETWORK_STATE` — access network/tethering state information.
 - `ACCESS_WIFI_STATE` — access Wi-Fi state information used by compatibility fallbacks.
+- `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE` — keep the event-driven tethering callback active while the widget is installed.
 
-It does not ask for location, contacts, phone, SMS, storage, or accessibility permissions. The app does not collect or transmit personal data.
+The foreground-service permissions are not runtime permission prompts. Android displays a low-priority, silent, ongoing notification while the monitor is active. The service performs no periodic polling and no network transfers. It stops when the last widget instance is removed.
+
+The app does not ask for location, contacts, phone, SMS, storage, or accessibility permissions. It does not collect or transmit personal data.
 
 ## Project structure
 
@@ -151,10 +156,11 @@ app/src/main/
 ├── kotlin/com/altmansoftwaredesign/hotspotwidget/
 │   ├── receiver/       # Legacy tether-state broadcast receiver
 │   ├── repository/     # State detection and API 36 callback
-│   ├── ui/             # Native Settings handoff and listener lifecycle
-│   └── widget/         # RemoteViews widget rendering
+│   ├── service/        # Persistent event-driven hotspot monitor
+│   ├── ui/             # Native Settings handoff
+│   └── widget/         # RemoteViews rendering and monitor lifecycle
 └── res/
-    ├── drawable/       # Card, slider, and power-icon artwork
+    ├── drawable/       # Card, slider, power, and notification artwork
     ├── layout/         # Widget and launcher layouts
     └── xml/            # App Widget provider metadata
 ```

@@ -4,74 +4,83 @@
 
 Hotspot Switch is a home-screen App Widget. Its card is rendered with Android `RemoteViews` and contains one large clickable surface. Tapping that surface opens `HotspotSettingsActivity`, which launches the device's native hotspot Settings screen.
 
-The app intentionally does not force-enable or force-disable tethering. The system Settings UI owns that privileged operation. The app observes the result and changes the widget's label, track, and slider-thumb position.
+The app does not force-enable or force-disable tethering. The system Settings UI owns that privileged operation. A separate foreground service observes the tethering state and updates the widget.
 
 ## Main components
 
 | Component | Responsibility |
 |---|---|
-| `HotspotWidgetProvider` | Creates/updates the RemoteViews card and routes taps to the helper Activity. |
-| `HotspotSettingsActivity` | Launches native Settings, maintains the state listener during the Settings visit, and refreshes on return. |
-| `Api36TetheringObserver` | Wraps the Android 16 public `TetheringManager.TetheringEventCallback`. |
+| `HotspotWidgetProvider` | Creates/updates the RemoteViews card, starts monitoring when a widget is added/updated, and stops it when the last widget is removed. |
+| `HotspotSettingsActivity` | Launches native Settings and requests a final refresh when the user returns. |
+| `HotspotMonitorService` | Long-lived event-driven observer. Keeps the tethering callback registered independently of Activity lifecycle and applies every state change to all widgets. |
+| `Api36TetheringObserver` | Wraps Android 16's public `TetheringManager.TetheringEventCallback`. |
 | `HotspotRepository` | Provides legacy/OEM fallback state reads and parses Wi-Fi AP/tethering broadcasts. |
-| `TetherStateReceiver` | Receives legacy tether-state broadcasts on older Android versions. |
+| `TetherStateReceiver` | Receives legacy tether-state broadcasts. |
 
 ## Android 16 (API 36) path
 
-On Android 16, `Api36TetheringObserver` obtains the public `TetheringManager` service and registers a `TetheringEventCallback` using the application's main executor.
+On Android 16, `HotspotMonitorService` obtains the public `TetheringManager` service and registers `TetheringEventCallback` using the application's main executor.
 
-The callback receives `onTetheredInterfacesChanged` with the current set of `TetheringInterface` values. The widget treats the hotspot as ON when the set contains an interface whose type equals `TetheringManager.TETHERING_WIFI`.
+The callback receives `onTetheredInterfacesChanged` immediately after registration with the current set of `TetheringInterface` values, and receives further calls when that set changes. The service treats the hotspot as ON when the set contains an interface whose type equals `TetheringManager.TETHERING_WIFI`.
 
-This avoids relying on vendor-specific interface names such as `wlan0`, `swlan0`, or `ap0`.
+This avoids relying on vendor-specific interface names such as `wlan0`, `swlan0`, or `ap0`. Because the callback remains registered in the service, OFF transitions are not dependent on the temporary Settings Activity still existing.
 
-## Listener lifecycle
+## Monitor lifecycle
 
-The helper Activity must stay alive while Samsung Settings is in the foreground, otherwise its callback is unregistered before the user changes hotspot state.
+1. The first widget is added. `HotspotWidgetProvider.onEnabled()` starts `HotspotMonitorService`.
+2. The service promotes itself to a foreground service and posts a low-priority, silent, ongoing notification.
+3. On Android 16, the service registers one public `TetheringEventCallback` and keeps its unregister handle for the lifetime of the service.
+4. The initial callback supplies the current tethered-interface set. The service updates all widget instances.
+5. Every later `onTetheredInterfacesChanged` callback is checked for `TETHERING_WIFI`, then the service immediately applies the new ON/OFF state to the widget RemoteViews.
+6. Tapping the widget opens native Settings. The service remains alive while the helper Activity pauses and after the Activity closes.
+7. When the last widget is removed, `HotspotWidgetProvider.onDisabled()` stops the service and removes its notification.
+8. The service uses `START_STICKY`; if Android reclaims the process, it can recreate the service and re-register the callback. A user force-stop or device restart may require tapping the widget once to re-arm monitoring.
 
-The lifecycle is deliberately:
+No timer or periodic polling loop is used.
 
-1. Widget tap launches `HotspotSettingsActivity`.
-2. During `onCreate`, the Activity registers the API 36 tethering callback.
-3. The Activity launches native hotspot Settings.
-4. The helper Activity pauses. It records that it was paused because Settings was opened.
-5. While Settings is visible, the callback remains registered. Each tethering-interface change updates the RemoteViews widget.
-6. When the user returns, the helper Activity resumes. Only this second resume is treated as a return from Settings.
-7. The Activity refreshes the widget, waits briefly for the final Soft AP transition callback, refreshes again, then finishes and unregisters the listener.
+## Why a foreground service is used
 
-The initial `onResume` is not treated as a return from Settings. This distinction is important: finishing the helper Activity during its initial resume would unregister the observer too early.
+A callback registered only by an Activity is tied to that Activity/process lifecycle. It can disappear after the Activity closes or if Android reclaims the process while Settings is in front. A normal background process is not guaranteed to remain alive indefinitely.
+
+The foreground service keeps the listener registered while the widget is installed. Android requires the ongoing notification for this user-visible background work. The notification is low priority, silent, and contains no activity or battery data.
+
+The service is event-driven. It does not poll tethering state, access the internet, or control tethering.
 
 ## Older Android fallback
 
-For Android 12–15, the app retains best-effort fallback methods:
+For Android 12–15, the service registers dynamic receivers for Wi-Fi AP and tether-state broadcasts and performs best-effort reads through:
 
-1. Read the Wi-Fi AP state using the legacy `WifiManager.getWifiApState()` reflection path where available.
-2. Inspect the `WIFI_AP_STATE_CHANGED` sticky broadcast.
-3. Inspect the `TETHER_STATE_CHANGED` sticky broadcast.
-4. Inspect the legacy tethered-interface list when accessible.
+1. The legacy `WifiManager.getWifiApState()` reflection path where available.
+2. The `WIFI_AP_STATE_CHANGED` broadcast.
+3. The `TETHER_STATE_CHANGED` broadcast.
+4. The legacy tethered-interface list when accessible.
 
-These APIs and broadcasts are OEM-dependent. Their behavior is not guaranteed to match the Android 16 public callback on every device.
+These APIs and broadcasts are OEM-dependent and may not behave identically on every device.
 
 ## Widget rendering
 
-The widget is drawn with RemoteViews-supported views and drawable resources:
+The widget uses RemoteViews-supported views and drawable resources:
 
 - `widget_background.xml` — rounded dark gradient card.
 - `switch_track_off.xml` / `switch_track_on.xml` — state-specific track.
 - `switch_thumb.xml` — white thumb.
-- `ic_switch_power.xml` — power glyph.
+- `ic_switch_power.xml` — slider power glyph.
+- `ic_monitor_notification.xml` — monochrome status icon.
 - `HotspotWidgetProvider` — sets ON/OFF text, colors, visibility, and accessibility description.
 
 Keep new widget layouts within the RemoteViews-supported view and operation set; unsupported custom view classes can cause launchers to display “Couldn't add widget.”
 
-## Permissions
+## Permissions and notification
 
 The manifest declares:
 
 - `android.permission.ACCESS_NETWORK_STATE`
 - `android.permission.ACCESS_WIFI_STATE`
+- `android.permission.FOREGROUND_SERVICE`
+- `android.permission.FOREGROUND_SERVICE_SPECIAL_USE`
 
-These are normal permissions; the user is not asked to grant a runtime permission dialog for them.
+The service is declared as `specialUse`, with a manifest subtype explaining that it continuously observes tethering events to keep the user-visible widget accurate. These foreground-service permissions do not produce a runtime permission dialog. Android displays the required ongoing notification while the service runs.
 
 ## Important boundary
 
-State observation is separate from hotspot control. The app does not claim that it can bypass carrier provisioning, OEM rules, or privileged tethering permissions. A tap opens the native system control; the widget then displays the state reported by Android.
+State observation is separate from hotspot control. The app does not bypass carrier provisioning, OEM rules, or privileged tethering permissions. A tap opens the native system control; the monitor then reflects the state reported by Android.

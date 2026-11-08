@@ -35,7 +35,7 @@ Install over an existing installation:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-If Android reports an APK signature conflict, uninstall the previous app before installing the new debug APK.
+If Android reports an APK signature conflict, uninstall the previous debug-signed app before installing the new debug APK.
 
 ## Build in Android Studio
 
@@ -86,9 +86,9 @@ After a successful build on `main`, the release job uses the repository's `GITHU
 
 The release tag is generated from `versionName` in `app/build.gradle.kts`:
 
-- App version `1.3.9` → release tag `v1.3.9`
+- App version `1.4.0` → release tag `v1.4.0`
 - Stable release asset: `hotspot-switch.apk`
-- Versioned asset: `hotspot-switch-1.3.9.apk`
+- Versioned asset: `hotspot-switch-1.4.0.apk`
 - Checksum asset: `hotspot-switch.SHA256SUMS.txt`
 
 The README uses GitHub's stable latest-release asset URL:
@@ -98,6 +98,19 @@ https://github.com/oscpprep/hotspot-widget/releases/latest/download/hotspot-swit
 ```
 
 When preparing a new app release, increment both `versionCode` and `versionName` in `app/build.gradle.kts`, then merge the change into `main`. The workflow publishes the new tag and assets automatically.
+
+## Foreground service notes
+
+Version 1.4.0 adds a persistent, event-driven monitor so the API 36 tethering callback remains registered while the widget exists.
+
+- The monitor is declared as a `specialUse` foreground service.
+- The manifest includes `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE`.
+- A service-level `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE` explains the event-driven widget-monitoring purpose.
+- A low-priority, silent, ongoing notification is required while the monitor is active.
+- The service starts when the widget is added/refreshed and stops when the last widget is removed.
+- The monitor is event-driven; it does not use periodic polling.
+
+If distributing through Google Play in the future, review and complete the Play Console foreground-service declaration and policy requirements for the `specialUse` type. The manifest subtype alone does not constitute Play approval.
 
 ## Verify a downloaded APK
 
