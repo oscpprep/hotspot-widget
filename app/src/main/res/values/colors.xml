@@ -1,23 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="hotspot_on">#4CAF50</color>
-    <color name="hotspot_off">#9E9E9E</color>
-    <color name="state_unknown">#FF9800</color>
-    <color name="battery_high">#4CAF50</color>
-    <color name="battery_medium">#FF9800</color>
-    <color name="battery_low">#F44336</color>
-
-    <!-- Charging badge. Deliberately neutral (not themed, not hue-coded): the
-         badge sits on top of the green/orange/red battery icon, so it must read
-         regardless of level and regardless of light/dark surface, and must not
-         rely on colour for red-green colour-blind users. Dark disc + light ring
-         + white bolt gives ~15:1 internal contrast and 6-10:1 against every
-         battery-level colour. -->
-    <color name="charging_badge_bg">#1F1F1F</color>
-    <color name="charging_badge_ring">#FAFAFA</color>
-    <color name="charging_badge_bolt">#FFFFFF</color>
+    <color name="hotspot_on">#168A45</color>
+    <color name="hotspot_off">#858B94</color>
     <color name="widget_background">#FAFAFA</color>
     <color name="widget_text">#1A1A1A</color>
-    <color name="divider">#E0E0E0</color>
     <color name="ic_launcher_background">#1565C0</color>
 </resources>
