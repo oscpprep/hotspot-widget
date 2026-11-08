@@ -8,16 +8,20 @@ import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.widget.HotspotWidgetProvider
 
 /**
- * Receives Android's protected tether-state broadcast. The system sends a
- * sticky broadcast with active interface names whenever tethering changes.
- * The action is protected by Android, so ordinary apps cannot spoof it.
+ * Receives Android Wi-Fi AP state transitions and tethering changes.
+ * The Wi-Fi AP state is the authoritative primary signal; tether interface
+ * broadcasts remain as a fallback for device-specific implementations.
  */
 class TetherStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != ACTION_TETHER_STATE_CHANGED) return
+        val repository = HotspotRepository(context)
+        val state = when (intent.action) {
+            ACTION_WIFI_AP_STATE_CHANGED -> repository.parseWifiApStateIntent(intent)
+            ACTION_TETHER_STATE_CHANGED -> repository.parseTetherStateIntent(intent)
+            else -> null
+        }
 
-        val state = HotspotRepository(context).parseTetherStateIntent(intent)
-        Log.d(TAG, "Received tether-state update: $state")
+        Log.d(TAG, "Received ${intent.action} state=$state")
         if (state != null) {
             HotspotWidgetProvider.updateWidgets(
                 context,
@@ -28,6 +32,7 @@ class TetherStateReceiver : BroadcastReceiver() {
 
     private companion object {
         const val TAG = "TetherStateReceiver"
+        const val ACTION_WIFI_AP_STATE_CHANGED = "android.net.wifi.WIFI_AP_STATE_CHANGED"
         const val ACTION_TETHER_STATE_CHANGED = "android.net.conn.TETHER_STATE_CHANGED"
     }
 }
