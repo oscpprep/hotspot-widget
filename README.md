@@ -17,20 +17,31 @@ The widget tries these Settings actions in order:
 3. Android wireless/network settings
 4. General Android Settings
 
-It refreshes the switch state when the user returns from Settings.
-
 On Samsung Galaxy phones, the manual path is **Settings → Connections → Mobile
 Hotspot and Tethering → Mobile Hotspot**.
+
+## Hotspot state detection
+
+The widget listens for Android's Wi-Fi AP state-change broadcast:
+
+- Action: `android.net.wifi.WIFI_AP_STATE_CHANGED`
+- State extra: `wifi_state`
+- `13` = enabled, `11` = disabled, `12` = enabling, `10` = disabling,
+  `14` = failed
+
+The app keeps a receiver active while the system Settings page is open. It applies
+the received enabled/disabled event directly to the widget and uses that observed
+event when returning from Settings, so a stale interface query cannot overwrite it.
+A reflective `WifiManager.getWifiApState()` query and tethered-interface checks are
+retained as fallbacks for OEM builds that do not expose the AP state broadcast.
 
 ## Features
 
 - One large, state-aware home-screen switch
 - No battery percentage, battery icon, status panel, or confirmation dialog
-- No special permission screen, foreground service, background notification,
-  boot receiver, root access, or accessibility-service automation
-- The live switch state is read where the device exposes the tethered-interface
-  list. If an OEM blocks that read, the widget still opens system hotspot controls
-  and describes its state as unavailable to accessibility services.
+- No foreground service, background notification, boot receiver, root access, or
+  accessibility-service automation
+- The state is read-only; the system Settings app performs the actual change
 
 ## Requirements
 
@@ -53,4 +64,5 @@ Then add the widget: long-press the home screen → **Widgets** → **Hotspot Sw
 A third-party app cannot reliably change mobile-hotspot state directly across Android
 versions and manufacturers. This version deliberately uses the system Settings UI.
 Tapping the widget opens the native hotspot page; the user taps the actual system
-switch there. The widget then refreshes its own state when the Settings page closes.
+switch there. The widget then updates from the Wi-Fi AP state event when the system
+reports the change.
