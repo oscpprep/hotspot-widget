@@ -1,8 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="hotspot_on">#168A45</color>
-    <color name="hotspot_off">#858B94</color>
-    <color name="widget_background">#FAFAFA</color>
-    <color name="widget_text">#1A1A1A</color>
+    <color name="hotspot_on">#21B66B</color>
+    <color name="hotspot_off">#66758A</color>
+    <color name="widget_background_start">#26364C</color>
+    <color name="widget_background_end">#172235</color>
+    <color name="widget_border">#394B63</color>
+    <color name="widget_label">#AEBBD0</color>
+    <color name="widget_state_off">#F3F6FB</color>
+    <color name="widget_state_on">#7AE7AC</color>
+    <color name="widget_state_unknown">#F4C16A</color>
+    <color name="switch_track_off_start">#59697F</color>
+    <color name="switch_track_off_end">#43536A</color>
+    <color name="switch_track_on_start">#35CE82</color>
+    <color name="switch_track_on_end">#159B5A</color>
+    <color name="switch_thumb_color">#FFFFFF</color>
+    <color name="switch_power_icon">#1D2C40</color>
     <color name="ic_launcher_background">#1565C0</color>
 </resources>
