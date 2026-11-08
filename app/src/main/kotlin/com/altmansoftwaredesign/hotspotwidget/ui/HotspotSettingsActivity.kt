@@ -18,13 +18,17 @@ import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.widget.HotspotWidgetProvider
 
 /**
- * Opens Samsung/Android hotspot controls. On Android 16 it keeps the public
- * TetheringManager listener active while Settings is in front. Earlier Android
- * versions retain the Wi-Fi AP broadcast listener as a best-effort fallback.
+ * Opens Samsung/Android hotspot controls and keeps a state listener alive
+ * for the entire time the system Settings screen is in front.
+ *
+ * Important lifecycle rule: onResume immediately after Activity creation is
+ * NOT treated as a return from Settings. The listener is released only after
+ * this Activity has actually been paused by launching Settings and then resumed.
  */
 class HotspotSettingsActivity : Activity() {
 
     private var settingsOpened = false
+    private var hasPausedForSettings = false
     private var receiverRegistered = false
     private var unregisterTetheringCallback: (() -> Unit)? = null
     @Volatile private var lastObservedApState: Boolean? = null
@@ -36,6 +40,7 @@ class HotspotSettingsActivity : Activity() {
                 .parseWifiApStateIntent(intent)
             if (state != null) {
                 lastObservedApState = state
+                Log.i(TAG, "Wi-Fi AP broadcast observed: state=$state")
                 HotspotWidgetProvider.updateWidgets(
                     this@HotspotSettingsActivity,
                     hotspotStateOverride = state
@@ -46,18 +51,41 @@ class HotspotSettingsActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         if (Build.VERSION.SDK_INT >= 36) {
             registerPublicTetheringCallback()
         } else {
             registerWifiApReceiver()
         }
-        if (savedInstanceState == null) openSystemHotspotSettings()
+
+        if (savedInstanceState == null) {
+            openSystemHotspotSettings()
+        }
+    }
+
+    override fun onPause() {
+        // startActivity() from onCreate() causes this Activity to pause while
+        // Samsung Settings is displayed. Only a later onResume is the return.
+        if (settingsOpened) {
+            hasPausedForSettings = true
+            Log.d(TAG, "Paused while system hotspot Settings is open")
+        }
+        super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
-        if (settingsOpened) {
+
+        // Do not finish on the initial onResume. The Settings Activity may have
+        // been launched during onCreate, and the tethering listener must survive
+        // until the user has actually switched hotspot state in Settings.
+        if (settingsOpened && hasPausedForSettings) {
+            hasPausedForSettings = false
+            Log.i(TAG, "Returned from system Settings; refreshing widget state")
             refreshFromBestAvailableState()
+
+            // Give Android's last tethering callback / Soft AP transition time
+            // to arrive before releasing the listener.
             window.decorView.postDelayed({
                 if (!isFinishing && !isDestroyed) {
                     refreshFromBestAvailableState()
@@ -70,8 +98,13 @@ class HotspotSettingsActivity : Activity() {
     private fun refreshFromBestAvailableState() {
         val observed = lastObservedApState
         if (observed != null) {
-            HotspotWidgetProvider.updateWidgets(this, hotspotStateOverride = observed)
+            Log.i(TAG, "Applying last observed tether state: $observed")
+            HotspotWidgetProvider.updateWidgets(
+                this,
+                hotspotStateOverride = observed
+            )
         } else {
+            Log.i(TAG, "No tether state event captured; requesting current state snapshot")
             HotspotWidgetProvider.updateWidgets(this)
         }
     }
@@ -80,20 +113,22 @@ class HotspotSettingsActivity : Activity() {
         try {
             unregisterTetheringCallback = Api36TetheringObserver.register(this) { state ->
                 lastObservedApState = state
-                Log.i(TAG, "API 36 public tethering callback: wifi=$state")
+                Log.i(TAG, "API 36 TetheringEventCallback reports Wi-Fi tethered=$state")
                 HotspotWidgetProvider.updateWidgets(
                     this@HotspotSettingsActivity,
                     hotspotStateOverride = state
                 )
             }
+            Log.i(TAG, "API 36 tethering listener registered; keeping it active through Settings")
         } catch (e: Exception) {
-            Log.w(TAG, "Could not register public API 36 tethering callback", e)
+            Log.e(TAG, "Could not register public API 36 tethering callback", e)
         }
     }
 
     override fun onDestroy() {
         unregisterTetheringCallback?.invoke()
         unregisterTetheringCallback = null
+
         if (receiverRegistered) {
             try {
                 unregisterReceiver(wifiApReceiver)
@@ -102,6 +137,7 @@ class HotspotSettingsActivity : Activity() {
             }
             receiverRegistered = false
         }
+
         super.onDestroy()
     }
 
@@ -115,6 +151,7 @@ class HotspotSettingsActivity : Activity() {
                 ContextCompat.RECEIVER_EXPORTED
             )
             receiverRegistered = true
+            Log.i(TAG, "Legacy Wi-Fi AP state receiver registered")
         } catch (e: Exception) {
             Log.w(TAG, "Could not register Wi-Fi AP state receiver", e)
         }
@@ -132,6 +169,7 @@ class HotspotSettingsActivity : Activity() {
             try {
                 settingsOpened = true
                 startActivity(intent)
+                Log.i(TAG, "Opened system hotspot Settings: ${intent.action}")
                 return
             } catch (e: ActivityNotFoundException) {
                 settingsOpened = false
@@ -148,7 +186,7 @@ class HotspotSettingsActivity : Activity() {
 
     private companion object {
         const val TAG = "HotspotSettings"
-        const val RETURN_REFRESH_DELAY_MS = 1000L
+        const val RETURN_REFRESH_DELAY_MS = 2500L
         const val ACTION_WIFI_AP_STATE_CHANGED = "android.net.wifi.WIFI_AP_STATE_CHANGED"
         const val ACTION_WIFI_TETHER_SETTINGS = "com.android.settings.WIFI_TETHER_SETTINGS"
         const val ACTION_TETHER_SETTINGS = "android.settings.TETHER_SETTINGS"
