@@ -16,14 +16,15 @@ import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.widget.HotspotWidgetProvider
 
 /**
- * Opens Samsung/Android hotspot controls. While Settings is in front, this
- * Activity remains registered for Wi-Fi AP state changes so the widget can be
- * redrawn as soon as Samsung reports ON or OFF.
+ * Opens Samsung/Android hotspot controls. The activity listens for the Wi-Fi
+ * AP state while Settings is in front and retains that authoritative event
+ * when returning, preventing a stale interface query from overwriting it.
  */
 class HotspotSettingsActivity : Activity() {
 
     private var settingsOpened = false
     private var receiverRegistered = false
+    @Volatile private var lastObservedApState: Boolean? = null
 
     private val wifiApReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -31,6 +32,8 @@ class HotspotSettingsActivity : Activity() {
             val state = HotspotRepository(this@HotspotSettingsActivity)
                 .parseWifiApStateIntent(intent)
             if (state != null) {
+                lastObservedApState = state
+                Log.i(TAG, "Wi-Fi AP state event received: $state")
                 HotspotWidgetProvider.updateWidgets(
                     this@HotspotSettingsActivity,
                     hotspotStateOverride = state
@@ -48,15 +51,26 @@ class HotspotSettingsActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (settingsOpened) {
-            // Refresh twice after returning: once immediately and once after the
-            // Settings UI has completed its last Soft AP transition/broadcast.
-            HotspotWidgetProvider.updateWidgets(this)
+            refreshFromBestAvailableState()
+            // Samsung may finish the AP transition just after its Settings page
+            // closes. Prefer a state event observed while Settings was open.
             window.decorView.postDelayed({
                 if (!isFinishing && !isDestroyed) {
-                    HotspotWidgetProvider.updateWidgets(this)
+                    refreshFromBestAvailableState()
                     finish()
                 }
             }, RETURN_REFRESH_DELAY_MS)
+        }
+    }
+
+    private fun refreshFromBestAvailableState() {
+        val observed = lastObservedApState
+        if (observed != null) {
+            Log.i(TAG, "Refreshing widget from observed Wi-Fi AP event: $observed")
+            HotspotWidgetProvider.updateWidgets(this, hotspotStateOverride = observed)
+        } else {
+            Log.i(TAG, "No Wi-Fi AP event observed; querying current device state")
+            HotspotWidgetProvider.updateWidgets(this)
         }
     }
 
@@ -115,7 +129,7 @@ class HotspotSettingsActivity : Activity() {
 
     private companion object {
         const val TAG = "HotspotSettings"
-        const val RETURN_REFRESH_DELAY_MS = 900L
+        const val RETURN_REFRESH_DELAY_MS = 1000L
         const val ACTION_WIFI_AP_STATE_CHANGED = "android.net.wifi.WIFI_AP_STATE_CHANGED"
         const val ACTION_WIFI_TETHER_SETTINGS = "com.android.settings.WIFI_TETHER_SETTINGS"
         const val ACTION_TETHER_SETTINGS = "android.settings.TETHER_SETTINGS"
