@@ -18,9 +18,9 @@ import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.widget.HotspotWidgetProvider
 
 /**
- * Opens Samsung/Android hotspot controls. On Android 16 it uses the public
- * TetheringManager callback while Settings is in front. Older releases retain
- * the Wi-Fi AP broadcast listener as a best-effort fallback.
+ * Opens Samsung/Android hotspot controls. On Android 16 it keeps the public
+ * TetheringManager listener active while Settings is in front. Earlier Android
+ * versions retain the Wi-Fi AP broadcast listener as a best-effort fallback.
  */
 class HotspotSettingsActivity : Activity() {
 
