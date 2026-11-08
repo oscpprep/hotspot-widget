@@ -193,15 +193,13 @@ class HotspotMonitorService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private companion object {
-        const val TAG = "HotspotMonitorService"
-        const val NOTIFICATION_ID = 2401
-        const val CHANNEL_ID = "hotspot_state_monitor"
-        const val ACTION_WIFI_AP_STATE_CHANGED = "android.net.wifi.WIFI_AP_STATE_CHANGED"
-        const val ACTION_TETHER_STATE_CHANGED = "android.net.conn.TETHER_STATE_CHANGED"
-    }
-
     companion object {
+        private const val TAG = "HotspotMonitorService"
+        private const val NOTIFICATION_ID = 2401
+        private const val CHANNEL_ID = "hotspot_state_monitor"
+        private const val ACTION_WIFI_AP_STATE_CHANGED = "android.net.wifi.WIFI_AP_STATE_CHANGED"
+        private const val ACTION_TETHER_STATE_CHANGED = "android.net.conn.TETHER_STATE_CHANGED"
+
         fun start(context: Context) {
             val intent = Intent(context, HotspotMonitorService::class.java)
             ContextCompat.startForegroundService(context.applicationContext, intent)
