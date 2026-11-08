@@ -1,7 +1,6 @@
 package com.altmansoftwaredesign.hotspotwidget.ui
 
 import android.app.Activity
-import android.appwidget.AppWidgetManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
@@ -12,13 +11,12 @@ import com.altmansoftwaredesign.hotspotwidget.R
 import com.altmansoftwaredesign.hotspotwidget.widget.HotspotWidgetProvider
 
 /**
- * Opens the OEM/system hotspot controls.
- *
- * No root, hidden tethering start/stop API, WRITE_SETTINGS permission, or
- * accessibility automation is used. The user makes the final change in the
- * Settings UI supplied by Android or the device manufacturer.
+ * Opens the OEM/system hotspot controls and refreshes the widget when the
+ * user returns, so its ON/OFF display reflects the current system state.
  */
 class HotspotSettingsActivity : Activity() {
+
+    private var settingsOpened = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,11 +25,18 @@ class HotspotSettingsActivity : Activity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (settingsOpened) {
+            // Settings may not return a meaningful activity result. onResume
+            // is the reliable signal that the user came back from Samsung Settings.
+            HotspotWidgetProvider.updateWidgets(this)
+            finish()
+        }
+    }
+
     @Suppress("DEPRECATION")
     private fun openSystemHotspotSettings() {
-        // Device manufacturers do not all expose the same Settings action.
-        // Try the direct Wi-Fi tether screen first, then the general tethering
-        // screen, then progressively broader Settings destinations.
         val candidates = listOf(
             Intent(ACTION_WIFI_TETHER_SETTINGS),
             Intent(ACTION_TETHER_SETTINGS),
@@ -41,11 +46,14 @@ class HotspotSettingsActivity : Activity() {
 
         for (intent in candidates) {
             try {
-                startActivityForResult(intent, REQUEST_SETTINGS)
+                settingsOpened = true
+                startActivity(intent)
                 return
             } catch (e: ActivityNotFoundException) {
+                settingsOpened = false
                 Log.i(TAG, "Settings action not available: ${intent.action}")
             } catch (e: SecurityException) {
+                settingsOpened = false
                 Log.w(TAG, "Settings action blocked: ${intent.action}", e)
             }
         }
@@ -54,19 +62,8 @@ class HotspotSettingsActivity : Activity() {
         finish()
     }
 
-    @Deprecated("Uses the legacy activity-result callback for broad Android compatibility")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_SETTINGS) {
-            // Re-read the real state after the user leaves system Settings.
-            HotspotWidgetProvider.updateWidgets(this)
-            finish()
-        }
-    }
-
     private companion object {
         const val TAG = "HotspotSettings"
-        const val REQUEST_SETTINGS = 4107
         const val ACTION_WIFI_TETHER_SETTINGS = "com.android.settings.WIFI_TETHER_SETTINGS"
         const val ACTION_TETHER_SETTINGS = "android.settings.TETHER_SETTINGS"
     }
