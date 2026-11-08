@@ -2,40 +2,91 @@ package com.altmansoftwaredesign.hotspotwidget.ui
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.altmansoftwaredesign.hotspotwidget.R
+import com.altmansoftwaredesign.hotspotwidget.repository.HotspotRepository
 import com.altmansoftwaredesign.hotspotwidget.widget.HotspotWidgetProvider
 
 /**
- * Opens the OEM/system hotspot controls and refreshes the widget when the
- * user returns, so its ON/OFF display reflects the current system state.
+ * Opens Samsung/Android hotspot controls. While Settings is in front, this
+ * Activity remains registered for Wi-Fi AP state changes so the widget can be
+ * redrawn as soon as Samsung reports ON or OFF.
  */
 class HotspotSettingsActivity : Activity() {
 
     private var settingsOpened = false
+    private var receiverRegistered = false
+
+    private val wifiApReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != ACTION_WIFI_AP_STATE_CHANGED) return
+            val state = HotspotRepository(this@HotspotSettingsActivity)
+                .parseWifiApStateIntent(intent)
+            if (state != null) {
+                HotspotWidgetProvider.updateWidgets(
+                    this@HotspotSettingsActivity,
+                    hotspotStateOverride = state
+                )
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) {
-            openSystemHotspotSettings()
-        }
+        registerWifiApReceiver()
+        if (savedInstanceState == null) openSystemHotspotSettings()
     }
 
     override fun onResume() {
         super.onResume()
         if (settingsOpened) {
-            // Settings may not return a meaningful activity result. onResume
-            // is the reliable signal that the user came back from Samsung Settings.
+            // Refresh twice after returning: once immediately and once after the
+            // Settings UI has completed its last Soft AP transition/broadcast.
             HotspotWidgetProvider.updateWidgets(this)
-            finish()
+            window.decorView.postDelayed({
+                if (!isFinishing && !isDestroyed) {
+                    HotspotWidgetProvider.updateWidgets(this)
+                    finish()
+                }
+            }, RETURN_REFRESH_DELAY_MS)
         }
     }
 
-    @Suppress("DEPRECATION")
+    override fun onDestroy() {
+        if (receiverRegistered) {
+            try {
+                unregisterReceiver(wifiApReceiver)
+            } catch (e: Exception) {
+                Log.d(TAG, "Wi-Fi AP receiver already unregistered", e)
+            }
+            receiverRegistered = false
+        }
+        super.onDestroy()
+    }
+
+    private fun registerWifiApReceiver() {
+        if (receiverRegistered) return
+        try {
+            ContextCompat.registerReceiver(
+                this,
+                wifiApReceiver,
+                IntentFilter(ACTION_WIFI_AP_STATE_CHANGED),
+                ContextCompat.RECEIVER_EXPORTED
+            )
+            receiverRegistered = true
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not register Wi-Fi AP state receiver", e)
+        }
+    }
+
     private fun openSystemHotspotSettings() {
         val candidates = listOf(
             Intent(ACTION_WIFI_TETHER_SETTINGS),
@@ -64,6 +115,8 @@ class HotspotSettingsActivity : Activity() {
 
     private companion object {
         const val TAG = "HotspotSettings"
+        const val RETURN_REFRESH_DELAY_MS = 900L
+        const val ACTION_WIFI_AP_STATE_CHANGED = "android.net.wifi.WIFI_AP_STATE_CHANGED"
         const val ACTION_WIFI_TETHER_SETTINGS = "com.android.settings.WIFI_TETHER_SETTINGS"
         const val ACTION_TETHER_SETTINGS = "android.settings.TETHER_SETTINGS"
     }
